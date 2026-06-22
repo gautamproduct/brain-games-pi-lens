@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  getDailyPuzzles,
+  getDailyGrid,
+  getRandomGrid,
   todayKey,
-  POINTS,
-  MAX_SCORE,
-  PUZZLE_COUNT,
+  SIZE,
+  CELLS,
+  MISS_PENALTY_MS,
 } from './daily.js'
 import {
   getHandle,
   getTodayResult,
-  submitScore,
+  submitDaily,
+  getPracticeBest,
+  recordPractice,
   getDailyBoard,
   getAllTimeBoard,
 } from './leaderboard.js'
@@ -23,21 +26,39 @@ const prettyDate = () =>
     day: 'numeric',
   })
 
-function scoreForQuestion(elapsedSec, correct) {
-  if (!correct) return 0
-  const { base, speedMax, speedWindow, perQuestionTimeout } = POINTS
-  if (elapsedSec >= perQuestionTimeout) return base
-  const speedFrac = Math.max(
-    0,
-    (perQuestionTimeout - Math.max(elapsedSec, speedWindow)) /
-      (perQuestionTimeout - speedWindow),
-  )
-  return base + Math.round(speedMax * speedFrac)
+// 12.3s, or 1:04.8 once past a minute
+function fmt(ms) {
+  if (ms == null) return '—'
+  const s = ms / 1000
+  if (s < 60) return s.toFixed(1) + 's'
+  const m = Math.floor(s / 60)
+  const rest = (s % 60).toFixed(1).padStart(4, '0')
+  return `${m}:${rest}`
 }
 
 export default function App() {
   const [view, setView] = useState('home') // home | play | result | board
-  const alreadyPlayed = useMemo(() => getTodayResult(), [])
+  const [mode, setMode] = useState('daily') // daily | practice
+  const [result, setResult] = useState(null)
+  const [round, setRound] = useState(0) // bumps per new game → fresh <Game/> mount
+
+  function play(m) {
+    setMode(m)
+    setResult(null)
+    setRound((r) => r + 1)
+    setView('play')
+  }
+
+  function onDone(r) {
+    if (mode === 'daily') {
+      const entry = submitDaily(r)
+      setResult({ ...r, name: entry.name })
+    } else {
+      const improved = recordPractice(r.netMs)
+      setResult({ ...r, improved, best: getPracticeBest() })
+    }
+    setView('result')
+  }
 
   return (
     <div className="app">
@@ -57,237 +78,246 @@ export default function App() {
           </div>
         </div>
         <button className="ghost-btn" onClick={() => setView('board')}>
-          🏆 Leaderboard
+          🏆 Ranks
         </button>
       </header>
 
       <main className="stage">
-        {view === 'home' && (
-          <Home
-            alreadyPlayed={alreadyPlayed}
-            onPlay={() => setView('play')}
-            onBoard={() => setView('board')}
-          />
-        )}
+        {view === 'home' && <Home onPlay={play} onBoard={() => setView('board')} />}
         {view === 'play' && (
-          <Game onDone={() => setView('result')} />
+          <Game key={mode + round} mode={mode} onDone={onDone} />
         )}
         {view === 'result' && (
           <Result
-            result={getTodayResult()}
+            mode={mode}
+            result={result}
             onBoard={() => setView('board')}
+            onAgain={() => play(mode)}
+            onHome={() => setView('home')}
           />
         )}
         {view === 'board' && <Board onBack={() => setView('home')} />}
       </main>
 
-      <footer className="foot">One challenge a day · same 7 for everyone</footer>
+      <footer className="foot">Tap 1 → 25 in order · train focus daily</footer>
     </div>
   )
 }
 
-function Home({ alreadyPlayed, onPlay, onBoard }) {
+function Home({ onPlay, onBoard }) {
+  const daily = useMemo(() => getTodayResult(), [])
+  const best = useMemo(() => getPracticeBest(), [])
+
   return (
     <div className="card center fade-in">
       <div className="date-pill">{prettyDate()}</div>
-      <h1 className="hero">7 problems.<br />Beat the clock.</h1>
+      <h1 className="hero">
+        Tap <span className="grad">1 → 25</span>
+        <br />
+        as fast as you can.
+      </h1>
       <p className="lede">
-        Same set for every player today. Score on accuracy <b>and</b> speed.
-        One attempt — make it count.
+        The grid the pros use to train <b>focus &amp; peripheral vision</b>. Eyes
+        still, mind sharp. Beat your best.
       </p>
 
-      {alreadyPlayed ? (
-        <>
-          <div className="done-banner">
-            ✅ You played today — scored <b>{alreadyPlayed.score}</b>
-          </div>
-          <button className="primary-btn" onClick={onBoard}>
-            See where you rank →
+      <div className="home-actions">
+        {daily ? (
+          <button className="primary-btn big locked" onClick={onBoard}>
+            ✅ Daily done — {fmt(daily.netMs)} · see ranks
           </button>
-          <p className="muted">Come back tomorrow for a new set.</p>
-        </>
-      ) : (
-        <>
-          <button className="primary-btn big" onClick={onPlay}>
-            Start today's challenge
+        ) : (
+          <button className="primary-btn big" onClick={() => onPlay('daily')}>
+            ▶ Today's Daily Grid
           </button>
-          <div className="rules">
-            <span>⚡ +50 speed bonus / question</span>
-            <span>⏱ 15s per question</span>
-            <span>🎯 {MAX_SCORE} pts max</span>
-          </div>
-        </>
-      )}
+        )}
+        <button className="secondary-btn big" onClick={() => onPlay('practice')}>
+          ♾ Practice — endless
+        </button>
+      </div>
+
+      <div className="rules">
+        <span>🏁 Same grid for everyone today</span>
+        {best && <span>⭐ Your best: {fmt(best)}</span>}
+        <span>⚠ Wrong tap = +1s</span>
+      </div>
     </div>
   )
 }
 
-function Game({ onDone }) {
-  const puzzles = useMemo(() => getDailyPuzzles(), [])
-  const [idx, setIdx] = useState(0)
-  const [input, setInput] = useState('')
-  const [score, setScore] = useState(0)
-  const [correctCount, setCorrectCount] = useState(0)
-  const [feedback, setFeedback] = useState(null) // {ok, gained, answer}
-  const [secs, setSecs] = useState(POINTS.perQuestionTimeout)
+function Game({ mode, onDone }) {
+  const grid = useMemo(
+    () => (mode === 'daily' ? getDailyGrid() : getRandomGrid()),
+    [mode],
+  )
+  const [next, setNext] = useState(1)
+  const [misses, setMisses] = useState(0)
+  const [elapsedMs, setElapsedMs] = useState(0)
+  const [flash, setFlash] = useState(null) // {v, type, k}
+  const [shaking, setShaking] = useState(false)
+  const [penaltyPop, setPenaltyPop] = useState(0)
 
-  const startRef = useRef(Date.now())
-  const totalStartRef = useRef(Date.now())
-  const inputRef = useRef(null)
-  const lockRef = useRef(false)
+  const startRef = useRef(0)
+  const intRef = useRef(null)
+  const doneRef = useRef(false)
+  const missRef = useRef(0)
+  // Track the current target in a ref so taps are never lost, even if the
+  // player taps faster than React re-renders.
+  const nextRef = useRef(1)
 
-  const current = puzzles[idx]
+  useEffect(() => () => clearInterval(intRef.current), [])
 
-  // Per-question countdown.
+  // clear the per-tile flash shortly after it fires
   useEffect(() => {
-    startRef.current = Date.now()
-    setSecs(POINTS.perQuestionTimeout)
-    lockRef.current = false
-    setFeedback(null)
-    setInput('')
-    inputRef.current?.focus()
+    if (!flash) return
+    const t = setTimeout(() => setFlash(null), 220)
+    return () => clearTimeout(t)
+  }, [flash])
 
-    const t = setInterval(() => {
-      const left =
-        POINTS.perQuestionTimeout -
-        Math.floor((Date.now() - startRef.current) / 1000)
-      setSecs(left)
-      if (left <= 0) {
-        clearInterval(t)
-        resolve(null) // timed out
+  function tap(v) {
+    if (doneRef.current) return
+    const cur = nextRef.current
+
+    if (v === cur) {
+      if (cur === 1) {
+        startRef.current = performance.now()
+        intRef.current = setInterval(
+          () => setElapsedMs(performance.now() - startRef.current),
+          50,
+        )
       }
-    }, 200)
-    return () => clearInterval(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx])
-
-  function resolve(value) {
-    if (lockRef.current) return
-    lockRef.current = true
-
-    const elapsed = (Date.now() - startRef.current) / 1000
-    const ok = value !== null && Number(value) === current.answer
-    const gained = scoreForQuestion(elapsed, ok)
-
-    const newScore = score + gained
-    const newCorrect = correctCount + (ok ? 1 : 0)
-    setScore(newScore)
-    setCorrectCount(newCorrect)
-    setFeedback({ ok, gained, answer: current.answer })
-
-    setTimeout(() => {
-      if (idx + 1 >= PUZZLE_COUNT) {
-        const timeMs = Date.now() - totalStartRef.current
-        submitScore({
-          score: newScore,
-          correct: newCorrect,
-          timeMs,
+      setFlash({ v, type: 'good', k: Math.random() })
+      if (cur === CELLS) {
+        clearInterval(intRef.current)
+        doneRef.current = true
+        const elapsed = performance.now() - startRef.current
+        onDone({
+          netMs: Math.round(elapsed + missRef.current * MISS_PENALTY_MS),
+          elapsedMs: Math.round(elapsed),
+          misses: missRef.current,
         })
-        onDone()
-      } else {
-        setIdx((i) => i + 1)
+        return
       }
-    }, 850)
+      nextRef.current = cur + 1
+      setNext(cur + 1)
+    } else {
+      missRef.current += 1
+      setMisses(missRef.current)
+      setFlash({ v, type: 'bad', k: Math.random() })
+      setShaking(true)
+      setPenaltyPop((p) => p + 1)
+      setTimeout(() => setShaking(false), 320)
+    }
   }
 
-  function onSubmit(e) {
-    e.preventDefault()
-    if (input.trim() === '' || lockRef.current) return
-    resolve(input.trim())
-  }
-
-  const pct = (idx / PUZZLE_COUNT) * 100
-  const timePct = Math.max(0, (secs / POINTS.perQuestionTimeout) * 100)
-  const low = secs <= 5
+  const progress = ((next - 1) / CELLS) * 100
 
   return (
     <div className="card play fade-in">
       <div className="play-head">
-        <div className="qcount">
-          Q{idx + 1}
-          <span>/{PUZZLE_COUNT}</span>
+        <div className="next-badge">
+          <span className="next-label">NEXT</span>
+          <span className="next-num">{next}</span>
         </div>
-        <div className="live-score">{score} pts</div>
+        <div className="play-stats">
+          <div className="timer-big">{fmt(elapsedMs)}</div>
+          <div className={`miss-line ${misses ? 'has' : ''}`}>
+            {misses ? `${misses} miss · +${misses}s` : 'no misses'}
+            {penaltyPop > 0 && (
+              <span key={penaltyPop} className="pen-pop">
+                +1s
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="progress">
-        <div className="progress-fill" style={{ width: `${pct}%` }} />
+        <div className="progress-fill" style={{ width: `${progress}%` }} />
       </div>
 
-      <div className="timer-wrap">
-        <div
-          className={`timer-bar ${low ? 'low' : ''}`}
-          style={{ width: `${timePct}%` }}
-        />
+      <div className={`grid ${shaking ? 'shake' : ''}`}>
+        {grid.map((v) => {
+          const done = v < next
+          const fl = flash && flash.v === v ? flash.type : ''
+          return (
+            <button
+              key={v}
+              className={`cell ${done ? 'done' : ''} ${fl}`}
+              onClick={() => tap(v)}
+            >
+              {v}
+            </button>
+          )
+        })}
       </div>
-      <div className={`timer-num ${low ? 'low' : ''}`}>{Math.max(secs, 0)}s</div>
 
-      <div className="problem">{current.text}</div>
-
-      <form onSubmit={onSubmit} className="answer-form">
-        <input
-          ref={inputRef}
-          className={`answer ${
-            feedback ? (feedback.ok ? 'ok' : 'bad') : ''
-          }`}
-          type="number"
-          inputMode="numeric"
-          placeholder="?"
-          value={input}
-          disabled={!!feedback}
-          onChange={(e) => setInput(e.target.value)}
-          autoFocus
-        />
-        <button className="primary-btn" type="submit" disabled={!!feedback}>
-          Enter
-        </button>
-      </form>
-
-      <div className="feedback-slot">
-        {feedback &&
-          (feedback.ok ? (
-            <span className="fb ok">✓ +{feedback.gained}</span>
-          ) : (
-            <span className="fb bad">✗ answer was {feedback.answer}</span>
-          ))}
+      <div className="play-hint">
+        {mode === 'daily' ? "Today's ranked grid" : 'Practice · endless'} · keep
+        your eyes near the centre
       </div>
     </div>
   )
 }
 
-function Result({ result, onBoard }) {
+function Result({ mode, result, onBoard, onAgain, onHome }) {
   if (!result) return null
-  const accuracy = Math.round((result.correct / PUZZLE_COUNT) * 100)
-  const secs = (result.timeMs / 1000).toFixed(1)
+  const isDaily = mode === 'daily'
 
   return (
     <div className="card center fade-in">
-      <div className="date-pill">Today's result</div>
-      <div className="big-score">{result.score}</div>
-      <div className="score-cap">out of {MAX_SCORE}</div>
+      {!isDaily && result.improved && (
+        <div className="date-pill best-pill">🎉 New personal best!</div>
+      )}
+      {(isDaily || !result.improved) && (
+        <div className="date-pill">{isDaily ? "Daily result" : 'Run complete'}</div>
+      )}
+
+      <div className="big-score">{fmt(result.netMs)}</div>
+      <div className="score-cap">net time {result.misses ? '(incl. penalties)' : ''}</div>
 
       <div className="stat-row">
         <div className="stat">
+          <div className="stat-num">{fmt(result.elapsedMs)}</div>
+          <div className="stat-label">raw time</div>
+        </div>
+        <div className="stat">
+          <div className="stat-num">{result.misses}</div>
+          <div className="stat-label">misses</div>
+        </div>
+        <div className="stat">
           <div className="stat-num">
-            {result.correct}/{PUZZLE_COUNT}
+            {isDaily ? result.name.split(' ')[0] : fmt(result.best)}
           </div>
-          <div className="stat-label">correct</div>
-        </div>
-        <div className="stat">
-          <div className="stat-num">{accuracy}%</div>
-          <div className="stat-label">accuracy</div>
-        </div>
-        <div className="stat">
-          <div className="stat-num">{secs}s</div>
-          <div className="stat-label">total time</div>
+          <div className="stat-label">{isDaily ? 'you are' : 'your best'}</div>
         </div>
       </div>
 
-      <p className="muted">You're on the board as <b>{result.name}</b></p>
-
-      <button className="primary-btn big" onClick={onBoard}>
-        See the daily leaderboard →
-      </button>
+      {isDaily ? (
+        <>
+          <p className="muted">
+            You're on the board as <b>{result.name}</b>
+          </p>
+          <button className="primary-btn big" onClick={onBoard}>
+            See the daily ranks →
+          </button>
+          <button className="text-btn" disabled>
+            Daily is one attempt · come back tomorrow
+          </button>
+        </>
+      ) : (
+        <>
+          <button className="primary-btn big" onClick={onAgain}>
+            ↻ Go again
+          </button>
+          <button className="secondary-btn big" onClick={onBoard}>
+            🏆 Daily ranks
+          </button>
+          <button className="text-btn" onClick={onHome}>
+            Home
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -302,7 +332,7 @@ function Board({ onBack }) {
   return (
     <div className="card fade-in">
       <div className="board-head">
-        <h2>Leaderboard</h2>
+        <h2>Fastest focus</h2>
         <button className="ghost-btn" onClick={onBack}>
           ← Back
         </button>
@@ -324,30 +354,31 @@ function Board({ onBack }) {
       </div>
 
       {rows.length === 0 ? (
-        <p className="empty">No scores yet. Be the first!</p>
+        <p className="empty">No times yet. Be the first!</p>
       ) : (
         <ol className="board-list">
           {rows.map((r, i) => (
             <li
               key={r.ts}
-              className={`board-row rank-${i + 1} ${
-                r.name === me ? 'me' : ''
-              }`}
+              className={`board-row rank-${i + 1} ${r.name === me ? 'me' : ''}`}
             >
               <span className="rank">{medal(i)}</span>
               <span className="lb-name">
                 {r.name}
                 {r.name === me && <span className="you-tag">you</span>}
               </span>
-              <span className="lb-meta">{(r.timeMs / 1000).toFixed(1)}s</span>
-              <span className="lb-score">{r.score}</span>
+              <span className="lb-meta">
+                {r.misses ? `${r.misses}✗` : '✓'}
+              </span>
+              <span className="lb-score">{fmt(r.netMs)}</span>
             </li>
           ))}
         </ol>
       )}
 
       <p className="muted small">
-        Scores are saved on this device. Hook up a backend for a shared board.
+        Ranked by net time. Scores are saved on this device — hook up a backend
+        for a shared board.
       </p>
     </div>
   )

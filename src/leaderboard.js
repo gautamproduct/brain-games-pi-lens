@@ -1,11 +1,13 @@
 // Leaderboard persistence. Currently localStorage (per-device).
 // Swap these functions for Supabase/REST calls to get a real shared board.
+// Ranking metric is NET TIME (lower is better): elapsed + miss penalties.
 
 import { todayKey } from './daily.js'
 
-const LB_KEY = 'speedmath.leaderboard'
-const PLAYED_KEY = 'speedmath.played'
-const HANDLE_KEY = 'speedmath.handle'
+const LB_KEY = 'schulte.leaderboard'
+const PLAYED_KEY = 'schulte.played'
+const HANDLE_KEY = 'schulte.handle'
+const BEST_KEY = 'schulte.practiceBest'
 
 // No name is ever asked. Each device gets a random anonymous handle on first
 // play so the leaderboard is readable without any sign-up friction.
@@ -41,7 +43,20 @@ function writeAll(rows) {
   localStorage.setItem(LB_KEY, JSON.stringify(rows))
 }
 
-// Has this device already played today?
+// --- practice personal best (endless mode) ---
+export function getPracticeBest() {
+  const v = Number(localStorage.getItem(BEST_KEY))
+  return Number.isFinite(v) && v > 0 ? v : null
+}
+
+export function recordPractice(netMs) {
+  const prev = getPracticeBest()
+  const improved = prev == null || netMs < prev
+  if (improved) localStorage.setItem(BEST_KEY, String(netMs))
+  return improved
+}
+
+// --- daily ranked attempt ---
 export function getTodayResult() {
   try {
     const played = JSON.parse(localStorage.getItem(PLAYED_KEY)) || {}
@@ -51,13 +66,13 @@ export function getTodayResult() {
   }
 }
 
-export function submitScore({ score, correct, timeMs }) {
+export function submitDaily({ netMs, elapsedMs, misses }) {
   const key = todayKey()
   const entry = {
     name: getHandle(),
-    score,
-    correct,
-    timeMs,
+    netMs,
+    elapsedMs,
+    misses,
     date: key,
     ts: Date.now(),
   }
@@ -79,10 +94,10 @@ export function submitScore({ score, correct, timeMs }) {
   return entry
 }
 
-// Rank: higher score first, then faster time.
+// Rank: fastest net time first; ties broken by fewer misses.
 function rankSort(a, b) {
-  if (b.score !== a.score) return b.score - a.score
-  return a.timeMs - b.timeMs
+  if (a.netMs !== b.netMs) return a.netMs - b.netMs
+  return a.misses - b.misses
 }
 
 export function getDailyBoard() {
@@ -93,7 +108,7 @@ export function getDailyBoard() {
 }
 
 export function getAllTimeBoard() {
-  // Best single run per handle, across all days.
+  // Best (fastest) run per handle, across all days.
   const best = new Map()
   for (const r of readAll()) {
     const prev = best.get(r.name)
