@@ -627,3 +627,15 @@ button { transition: transform .09s ease, box-shadow .22s ease, border-color .22
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* ============ bigger, comfier touch targets ============ */
+.ghost-btn { padding: 11px 16px; font-size: 14px; min-height: 42px; }
+.fchip { padding: 11px 16px; font-size: 14px; min-height: 42px; display: inline-flex; align-items: center; }
+.tab { padding: 12px; font-size: 14px; min-height: 42px; }
+.icon-btn { width: 44px; height: 44px; font-size: 18px; }
+.text-btn { padding: 12px 16px; font-size: 14px; min-height: 44px; }
+.yc-name .edit { display: inline-grid; place-items: center; width: 28px; height: 28px; font-size: 15px; }
+.chip-scroll { gap: 9px; padding-bottom: 6px; }
+/* a touch more breathing room between result actions */
+.result .primary-btn.big, .result .secondary-btn.big { margin-top: 10px; }
+.result .secondary-btn.big { margin-top: 8px; }

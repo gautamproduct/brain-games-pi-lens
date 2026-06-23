@@ -15,11 +15,14 @@ const COLORS = [
 ]
 
 export default function StroopRush({ rng, onFinish }) {
-  const makeRound = () => {
+  const makeRound = (idx) => {
+    const mismatchP = 0.7 + idx * 0.03 // later rounds almost always mismatch
     const word = pick(rng, COLORS)
     let ink = pick(rng, COLORS)
-    if (rng() < 0.78) while (ink.id === word.id) ink = pick(rng, COLORS)
+    if (rng() < mismatchP) while (ink.id === word.id) ink = pick(rng, COLORS)
     const opts = [ink]
+    // tempt the player with the colour the WORD names (the Stroop trap)
+    if (word.id !== ink.id) opts.push(word)
     while (opts.length < 4) {
       const c = COLORS[ri(rng, 0, COLORS.length - 1)]
       if (!opts.find((o) => o.id === c.id)) opts.push(c)
@@ -28,7 +31,7 @@ export default function StroopRush({ rng, onFinish }) {
   }
 
   const [i, setI] = useState(0)
-  const [round, setRound] = useState(makeRound)
+  const [round, setRound] = useState(() => makeRound(0))
   const [fb, setFb] = useState(null)
   const correctRef = useRef(0)
   const doneRef = useRef(false)
@@ -48,7 +51,7 @@ export default function StroopRush({ rng, onFinish }) {
     setFb(ok ? 'good' : 'bad')
     setTimeout(() => {
       if (i + 1 >= QS) finish()
-      else { setI(i + 1); setRound(makeRound()); setFb(null) }
+      else { setI(i + 1); setRound(makeRound(i + 1)); setFb(null) }
     }, 300)
   }
 

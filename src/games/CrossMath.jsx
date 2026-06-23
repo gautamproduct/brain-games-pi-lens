@@ -9,8 +9,9 @@ const TOTAL = 50000
 
 const apply = (a, op, b) => (op === '+' ? a + b : op === '−' ? a - b : a * b)
 
-function genPuzzle(rng) {
-  const num = () => ri(rng, 1, 9)
+function genPuzzle(rng, idx = 0) {
+  const max = idx < 2 ? 7 : idx < 4 ? 9 : 12 // later puzzles use bigger numbers
+  const num = () => ri(rng, 1, max)
   const opFor = (a, b) => {
     const cand = ['+', '×']
     if (a >= b) cand.push('−')
@@ -41,7 +42,7 @@ function genPuzzle(rng) {
 
 export default function CrossMath({ rng, onFinish }) {
   const [i, setI] = useState(0)
-  const [p, setP] = useState(() => genPuzzle(rng))
+  const [p, setP] = useState(() => genPuzzle(rng, 0))
   const [fb, setFb] = useState(null)
   const correctRef = useRef(0)
   const doneRef = useRef(false)
@@ -61,7 +62,7 @@ export default function CrossMath({ rng, onFinish }) {
     setFb({ v, ok })
     setTimeout(() => {
       if (i + 1 >= PUZZLES) finish()
-      else { setI(i + 1); setP(genPuzzle(rng)); setFb(null) }
+      else { setI(i + 1); setP(genPuzzle(rng, i + 1)); setFb(null) }
     }, 750)
   }
 
