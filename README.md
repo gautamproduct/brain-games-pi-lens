@@ -1,50 +1,53 @@
-# Speed Math — Daily Challenge
+# Brain Games by Pi Lens
 
-A one-a-day mental-math game with a leaderboard. Built for exam-prep students:
-trains fast calculation and focus, with a competitive daily habit loop.
+A Matiks-style **brain-games hub** for exam-prep students — no login, daily
+challenges, XP / levels / streaks, and per-game leaderboards. Original
+implementation; only the proven UX patterns are borrowed.
 
-## How it works
+**Live:** https://gautamproduct.github.io/brain-games-pi-lens/
 
-- **7 problems**, same set for everyone on a given day (deterministically seeded
-  from the date — see `src/daily.js`).
-- Difficulty ramps: add/subtract → tables → %/division/2-digit× → squares & order-of-ops.
-- **One attempt per day.** After playing, the device is locked until tomorrow.
-- **Scoring:** 100 base points per correct answer + up to 50 speed bonus
-  (answer within 6s for the full bonus; 15s timeout per question). Max **1050**.
-- **Leaderboard:** daily board (ranked by score, ties broken by total time) and
-  an all-time Hall of Fame.
+## What's inside
 
-## Run locally
+- **8 free games**, focus + math mix:
+  Schulte Grid · Stroop Rush · Flash Memory · Odd One Out · Speed Math ·
+  True or False · Next in Line · Reflex Tap
+- **Daily Challenge** — a featured game that rotates by date; every game's puzzle
+  is seeded from the date, so it refreshes automatically each day.
+- **No login.** Name is asked once (stored locally) and shown on the leaderboard.
+- **Gamification:** XP and levels, a daily 🔥 streak (loss-aversion lever),
+  per-game best scores.
+- **Leaderboards:** per-game (today / all-time) + an overall board, with your
+  own row highlighted.
+- Bottom-nav hub: Play · Ranks · You.
+
+## Structure
+
+```
+src/
+  lib/         rng (seeded daily), store (profile + leaderboards), useCountdown
+  games/       one component per game + index.js registry (name, colour, blurb)
+  App.jsx      hub, name gate, play session, results, ranks, profile
+  styles.css
+```
+
+Each game implements a tiny contract: `({ rng, onFinish }) => …` and calls
+`onFinish({ score, summary })` (higher score = better). Adding a game = drop a
+component in `src/games/` and register it in `index.js`.
+
+## Run / build
 
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm run build    # production build → dist/
+npm run build    # → dist/
 ```
 
-## Deploy to Vercel
+## Deploy
 
-Vercel auto-detects Vite. Either:
+Auto-deploys to GitHub Pages on every push to `main` (`.github/workflows/deploy.yml`).
 
-- Push to GitHub and import the repo at vercel.com (framework preset: **Vite**,
-  build `npm run build`, output `dist`), or
-- `npx vercel` from this folder.
+## Leaderboard backend
 
-No environment variables needed.
-
-## Leaderboard: localStorage vs. a real shared board
-
-The leaderboard currently uses **localStorage** — scores are per-device, so it works
-instantly with zero backend. Good for a demo or single-class kiosk.
-
-For a **real cross-device leaderboard**, swap the four functions in
-`src/leaderboard.js` (`submitScore`, `getDailyBoard`, `getAllTimeBoard`,
-`getTodayResult`) for calls to a backend. The fastest path is Supabase free tier:
-
-1. Create a `scores` table: `name`, `score`, `correct`, `time_ms`, `date`, `created_at`.
-2. Insert on submit, select-and-order for the boards.
-3. Keep the "already played today" check server-side (by date + a device/user id)
-   to stop replays.
-
-> Note on anti-cheat: total time is logged per run, so suspiciously fast perfect
-> scores can be flagged — a gap Matiks' leaderboard doesn't cover.
+Scores are **localStorage** (per-device) for now. For a real shared / batch
+leaderboard, replace the functions in `src/lib/store.js` (`recordScore`,
+`getBoard`, `getOverallBoard`) with Supabase/REST calls.

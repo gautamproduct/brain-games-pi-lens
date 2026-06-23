@@ -1,389 +1,409 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { GAMES, gameById, featuredGame } from './games/index.js'
+import { dailyRng, makeRng, todayKey } from './lib/rng.js'
 import {
-  getDailyGrid,
-  getRandomGrid,
-  todayKey,
-  SIZE,
-  CELLS,
-  MISS_PENALTY_MS,
-} from './daily.js'
-import {
-  getHandle,
-  getTodayResult,
-  submitDaily,
-  getPracticeBest,
-  recordPractice,
-  getDailyBoard,
-  getAllTimeBoard,
-} from './leaderboard.js'
+  getProfile,
+  hasName,
+  setName,
+  finishSession,
+  recordScore,
+  getBoard,
+  getOverallBoard,
+  levelProgress,
+  myName,
+  playedTodayIds,
+  myRankToday,
+} from './lib/store.js'
 
 const PI_LENS_URL = 'https://play.google.com/store/apps/details?id=live.pw.pilens'
 
-const prettyDate = () =>
-  new Date().toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  })
-
-// 12.3s, or 1:04.8 once past a minute
-function fmt(ms) {
-  if (ms == null) return '—'
-  const s = ms / 1000
-  if (s < 60) return s.toFixed(1) + 's'
-  const m = Math.floor(s / 60)
-  const rest = (s % 60).toFixed(1).padStart(4, '0')
-  return `${m}:${rest}`
-}
-
 export default function App() {
-  const [view, setView] = useState('home') // home | play | result | board
-  const [mode, setMode] = useState('daily') // daily | practice
-  const [result, setResult] = useState(null)
-  const [round, setRound] = useState(0) // bumps per new game → fresh <Game/> mount
+  const [tab, setTab] = useState('home') // home | ranks | profile
+  const [session, setSession] = useState(null) // { game, practice }
+  const [pending, setPending] = useState(null) // game waiting on name gate
+  const [, force] = useState(0)
+  const refresh = () => force((n) => n + 1)
 
-  function play(m) {
-    setMode(m)
-    setResult(null)
-    setRound((r) => r + 1)
-    setView('play')
+  function launch(game, practice = false) {
+    if (!hasName()) {
+      setPending({ game, practice })
+      return
+    }
+    setSession({ game, practice })
   }
 
-  function onDone(r) {
-    if (mode === 'daily') {
-      const entry = submitDaily(r)
-      setResult({ ...r, name: entry.name })
-    } else {
-      const improved = recordPractice(r.netMs)
-      setResult({ ...r, improved, best: getPracticeBest() })
-    }
-    setView('result')
+  function onNamed(name) {
+    setName(name)
+    const p = pending
+    setPending(null)
+    if (p) setSession({ game: p.game, practice: p.practice })
+    refresh()
   }
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <span className="logo">π</span>
-          <div>
-            <div className="brand-name">Brain Games</div>
-            <a
-              className="brand-sub link"
-              href={PI_LENS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              by Pi Lens ↗
-            </a>
-          </div>
-        </div>
-        <button className="ghost-btn" onClick={() => setView('board')}>
-          🏆 Ranks
-        </button>
-      </header>
+      <Header onProfile={() => setTab('profile')} />
 
       <main className="stage">
-        {view === 'home' && <Home onPlay={play} onBoard={() => setView('board')} />}
-        {view === 'play' && (
-          <Game key={mode + round} mode={mode} onDone={onDone} />
-        )}
-        {view === 'result' && (
-          <Result
-            mode={mode}
-            result={result}
-            onBoard={() => setView('board')}
-            onAgain={() => play(mode)}
-            onHome={() => setView('home')}
-          />
-        )}
-        {view === 'board' && <Board onBack={() => setView('home')} />}
+        {tab === 'home' && <Home onPlay={launch} />}
+        {tab === 'ranks' && <Ranks />}
+        {tab === 'profile' && <Profile onChanged={refresh} />}
       </main>
 
-      <footer className="foot">Tap 1 → 25 in order · train focus daily</footer>
+      <BottomNav tab={tab} setTab={setTab} />
+
+      {pending && <NameGate onSubmit={onNamed} onClose={() => setPending(null)} />}
+      {session && (
+        <Session
+          game={session.game}
+          practice={session.practice}
+          onExit={() => {
+            setSession(null)
+            refresh()
+          }}
+          onReplay={(g) => setSession({ game: g, practice: true })}
+        />
+      )}
     </div>
   )
 }
 
-function Home({ onPlay, onBoard }) {
-  const daily = useMemo(() => getTodayResult(), [])
-  const best = useMemo(() => getPracticeBest(), [])
+/* ----------------------------- chrome ----------------------------- */
+function Header({ onProfile }) {
+  const p = getProfile()
+  const { lvl, pct } = levelProgress(p.xp)
+  return (
+    <header className="topbar">
+      <div className="brand">
+        <span className="logo">π</span>
+        <div>
+          <div className="brand-name">Brain Games</div>
+          <a className="brand-sub link" href={PI_LENS_URL} target="_blank" rel="noopener noreferrer">
+            by Pi Lens ↗
+          </a>
+        </div>
+      </div>
+      <button className="streak-chip" onClick={onProfile}>
+        <span className="flame">🔥</span>
+        <b>{p.streak}</b>
+        <span className="lvl-mini">Lv {lvl}</span>
+        <span className="xpbar"><span style={{ width: `${pct}%` }} /></span>
+      </button>
+    </header>
+  )
+}
+
+function BottomNav({ tab, setTab }) {
+  const items = [
+    ['home', '🎮', 'Play'],
+    ['ranks', '🏆', 'Ranks'],
+    ['profile', '👤', 'You'],
+  ]
+  return (
+    <nav className="bottomnav">
+      {items.map(([id, icon, label]) => (
+        <button
+          key={id}
+          className={`navitem ${tab === id ? 'active' : ''}`}
+          onClick={() => setTab(id)}
+        >
+          <span className="navicon">{icon}</span>
+          {label}
+        </button>
+      ))}
+    </nav>
+  )
+}
+
+/* ------------------------------ home ------------------------------ */
+function Home({ onPlay }) {
+  const done = useMemo(() => playedTodayIds(), [])
+  const featured = featuredGame(todayKey())
+  const p = getProfile()
 
   return (
-    <div className="card center fade-in">
-      <div className="date-pill">{prettyDate()}</div>
-      <h1 className="hero">
-        Tap <span className="grad">1 → 25</span>
-        <br />
-        as fast as you can.
-      </h1>
-      <p className="lede">
-        The grid the pros use to train <b>focus &amp; peripheral vision</b>. Eyes
-        still, mind sharp. Beat your best.
-      </p>
+    <div className="home fade-in">
+      <DailyHero game={featured} onPlay={onPlay} done={done.has(featured.id)} />
 
-      <div className="home-actions">
-        {daily ? (
-          <button className="primary-btn big locked" onClick={onBoard}>
-            ✅ Daily done — {fmt(daily.netMs)} · see ranks
-          </button>
-        ) : (
-          <button className="primary-btn big" onClick={() => onPlay('daily')}>
-            ▶ Today's Daily Grid
-          </button>
-        )}
-        <button className="secondary-btn big" onClick={() => onPlay('practice')}>
-          ♾ Practice — endless
-        </button>
+      <div className="section-head">
+        <h2>Free Games</h2>
+        <span className="pill-free">8 unlocked</span>
       </div>
 
-      <div className="rules">
-        <span>🏁 Same grid for everyone today</span>
-        {best && <span>⭐ Your best: {fmt(best)}</span>}
-        <span>⚠ Wrong tap = +1s</span>
+      <div className="game-grid">
+        {GAMES.map((g) => (
+          <button
+            key={g.id}
+            className="game-card"
+            style={{ '--g1': g.g1, '--g2': g.g2 }}
+            onClick={() => onPlay(g)}
+          >
+            <div className="gc-emoji">{g.emoji}</div>
+            <div className="gc-name">{g.name}</div>
+            <div className="gc-blurb">{g.blurb}</div>
+            <div className="gc-foot">
+              <span className="gc-tag">{g.tag}</span>
+              {done.has(g.id) ? (
+                <span className="gc-done">✓ {p.best[g.id] ?? ''}</span>
+              ) : (
+                <span className="gc-play">Play ▸</span>
+              )}
+            </div>
+          </button>
+        ))}
       </div>
     </div>
   )
 }
 
-function Game({ mode, onDone }) {
-  const grid = useMemo(
-    () => (mode === 'daily' ? getDailyGrid() : getRandomGrid()),
-    [mode],
+function DailyHero({ game, onPlay, done }) {
+  return (
+    <button
+      className="daily-hero"
+      style={{ '--g1': game.g1, '--g2': game.g2 }}
+      onClick={() => onPlay(game)}
+    >
+      <div className="dh-top">
+        <span className="dh-label">★ DAILY CHALLENGE</span>
+        <span className="dh-date">{new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+      </div>
+      <div className="dh-main">
+        <span className="dh-emoji">{game.emoji}</span>
+        <div>
+          <div className="dh-name">{game.name}</div>
+          <div className="dh-sub">New puzzle today · {game.blurb}</div>
+        </div>
+      </div>
+      <div className="dh-cta">{done ? 'Play again ▸' : 'Start ▸'}</div>
+    </button>
   )
-  const [next, setNext] = useState(1)
-  const [misses, setMisses] = useState(0)
-  const [elapsedMs, setElapsedMs] = useState(0)
-  const [flash, setFlash] = useState(null) // {v, type, k}
-  const [shaking, setShaking] = useState(false)
-  const [penaltyPop, setPenaltyPop] = useState(0)
+}
 
-  const startRef = useRef(0)
-  const intRef = useRef(null)
-  const doneRef = useRef(false)
-  const missRef = useRef(0)
-  // Track the current target in a ref so taps are never lost, even if the
-  // player taps faster than React re-renders.
-  const nextRef = useRef(1)
+/* ---------------------------- session ----------------------------- */
+function Session({ game, practice, onExit, onReplay }) {
+  const [result, setResult] = useState(null)
+  // daily seed by default; practice uses a fresh random seed each mount
+  const rng = useMemo(
+    () => (practice ? makeRng(`${game.id}:practice:${Math.random()}`) : dailyRng(game.id)),
+    [game.id, practice],
+  )
 
-  useEffect(() => () => clearInterval(intRef.current), [])
-
-  // clear the per-tile flash shortly after it fires
-  useEffect(() => {
-    if (!flash) return
-    const t = setTimeout(() => setFlash(null), 220)
-    return () => clearTimeout(t)
-  }, [flash])
-
-  function tap(v) {
-    if (doneRef.current) return
-    const cur = nextRef.current
-
-    if (v === cur) {
-      if (cur === 1) {
-        startRef.current = performance.now()
-        intRef.current = setInterval(
-          () => setElapsedMs(performance.now() - startRef.current),
-          50,
-        )
-      }
-      setFlash({ v, type: 'good', k: Math.random() })
-      if (cur === CELLS) {
-        clearInterval(intRef.current)
-        doneRef.current = true
-        const elapsed = performance.now() - startRef.current
-        onDone({
-          netMs: Math.round(elapsed + missRef.current * MISS_PENALTY_MS),
-          elapsedMs: Math.round(elapsed),
-          misses: missRef.current,
-        })
-        return
-      }
-      nextRef.current = cur + 1
-      setNext(cur + 1)
-    } else {
-      missRef.current += 1
-      setMisses(missRef.current)
-      setFlash({ v, type: 'bad', k: Math.random() })
-      setShaking(true)
-      setPenaltyPop((p) => p + 1)
-      setTimeout(() => setShaking(false), 320)
-    }
+  function handleFinish({ score, summary }) {
+    // bounded so leveling stays sane and comparable across games
+    const xpGain = Math.min(250, Math.round(score / 12) + 15)
+    finishSession(game.id, score, xpGain)
+    recordScore(game.id, score, summary)
+    setResult({ score, summary, xpGain, rank: myRankToday(game.id) })
   }
 
-  const progress = ((next - 1) / CELLS) * 100
+  const Game = game.Component
 
   return (
-    <div className="card play fade-in">
-      <div className="play-head">
-        <div className="next-badge">
-          <span className="next-label">NEXT</span>
-          <span className="next-num">{next}</span>
+    <div className="session" style={{ '--g1': game.g1, '--g2': game.g2 }}>
+      <div className="session-top">
+        <button className="icon-btn" onClick={onExit}>
+          ✕
+        </button>
+        <div className="session-title">
+          <span>{game.emoji}</span> {game.name}
+          {practice && <span className="prac-tag">practice</span>}
         </div>
-        <div className="play-stats">
-          <div className="timer-big">{fmt(elapsedMs)}</div>
-          <div className={`miss-line ${misses ? 'has' : ''}`}>
-            {misses ? `${misses} miss · +${misses}s` : 'no misses'}
-            {penaltyPop > 0 && (
-              <span key={penaltyPop} className="pen-pop">
-                +1s
-              </span>
-            )}
-          </div>
-        </div>
+        <span className="session-spacer" />
       </div>
 
-      <div className="progress">
-        <div className="progress-fill" style={{ width: `${progress}%` }} />
-      </div>
-
-      <div className={`grid ${shaking ? 'shake' : ''}`}>
-        {grid.map((v) => {
-          const done = v < next
-          const fl = flash && flash.v === v ? flash.type : ''
-          return (
-            <button
-              key={v}
-              className={`cell ${done ? 'done' : ''} ${fl}`}
-              onClick={() => tap(v)}
-            >
-              {v}
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="play-hint">
-        {mode === 'daily' ? "Today's ranked grid" : 'Practice · endless'} · keep
-        your eyes near the centre
-      </div>
-    </div>
-  )
-}
-
-function Result({ mode, result, onBoard, onAgain, onHome }) {
-  if (!result) return null
-  const isDaily = mode === 'daily'
-
-  return (
-    <div className="card center fade-in">
-      {!isDaily && result.improved && (
-        <div className="date-pill best-pill">🎉 New personal best!</div>
-      )}
-      {(isDaily || !result.improved) && (
-        <div className="date-pill">{isDaily ? "Daily result" : 'Run complete'}</div>
-      )}
-
-      <div className="big-score">{fmt(result.netMs)}</div>
-      <div className="score-cap">net time {result.misses ? '(incl. penalties)' : ''}</div>
-
-      <div className="stat-row">
-        <div className="stat">
-          <div className="stat-num">{fmt(result.elapsedMs)}</div>
-          <div className="stat-label">raw time</div>
-        </div>
-        <div className="stat">
-          <div className="stat-num">{result.misses}</div>
-          <div className="stat-label">misses</div>
-        </div>
-        <div className="stat">
-          <div className="stat-num">
-            {isDaily ? result.name.split(' ')[0] : fmt(result.best)}
-          </div>
-          <div className="stat-label">{isDaily ? 'you are' : 'your best'}</div>
-        </div>
-      </div>
-
-      {isDaily ? (
-        <>
-          <p className="muted">
-            You're on the board as <b>{result.name}</b>
-          </p>
-          <button className="primary-btn big" onClick={onBoard}>
-            See the daily ranks →
-          </button>
-          <button className="text-btn" disabled>
-            Daily is one attempt · come back tomorrow
-          </button>
-        </>
+      {result ? (
+        <ResultView
+          game={game}
+          result={result}
+          onReplay={() => {
+            setResult(null)
+            onReplay(game)
+          }}
+          onExit={onExit}
+        />
       ) : (
-        <>
-          <button className="primary-btn big" onClick={onAgain}>
-            ↻ Go again
-          </button>
-          <button className="secondary-btn big" onClick={onBoard}>
-            🏆 Daily ranks
-          </button>
-          <button className="text-btn" onClick={onHome}>
-            Home
-          </button>
-        </>
+        <Game rng={rng} onFinish={handleFinish} />
       )}
     </div>
   )
 }
 
-function Board({ onBack }) {
-  const [tab, setTab] = useState('daily')
-  const daily = useMemo(() => getDailyBoard(), [])
-  const allTime = useMemo(() => getAllTimeBoard(), [])
-  const rows = tab === 'daily' ? daily : allTime
-  const me = getHandle()
+function ResultView({ game, result, onReplay, onExit }) {
+  const board = useMemo(() => getBoard(game.id, 'today'), [game.id])
+  const me = myName()
+  return (
+    <div className="result fade-in">
+      <div className="result-emoji">{game.emoji}</div>
+      <div className="result-score">{result.score}</div>
+      <div className="result-sum">{result.summary}</div>
+      <div className="result-chips">
+        <span className="rchip xp">+{result.xpGain} XP</span>
+        {result.rank && <span className="rchip rank">#{result.rank} today</span>}
+      </div>
+
+      <div className="mini-board">
+        <div className="mb-head">Today · {game.name}</div>
+        {board.slice(0, 5).map((r, i) => (
+          <div key={r.ts} className={`mb-row ${r.name === me ? 'me' : ''}`}>
+            <span className="mb-rank">{['🥇', '🥈', '🥉'][i] || i + 1}</span>
+            <span className="mb-name">{r.name}</span>
+            <span className="mb-score">{r.score}</span>
+          </div>
+        ))}
+      </div>
+
+      <button className="primary-btn big" onClick={onReplay}>
+        ↻ Play again
+      </button>
+      <button className="text-btn" onClick={onExit}>
+        Back to games
+      </button>
+    </div>
+  )
+}
+
+/* ----------------------------- ranks ------------------------------ */
+function Ranks() {
+  const [sel, setSel] = useState('overall')
+  const [scope, setScope] = useState('today')
+  const me = myName()
+  const rows =
+    sel === 'overall' ? getOverallBoard() : getBoard(sel, scope)
 
   return (
-    <div className="card fade-in">
-      <div className="board-head">
-        <h2>Fastest focus</h2>
-        <button className="ghost-btn" onClick={onBack}>
-          ← Back
+    <div className="ranks fade-in">
+      <h2 className="ranks-title">🏆 Leaderboards</h2>
+
+      <div className="chip-scroll">
+        <button className={`fchip ${sel === 'overall' ? 'on' : ''}`} onClick={() => setSel('overall')}>
+          ⭐ Overall
         </button>
+        {GAMES.map((g) => (
+          <button
+            key={g.id}
+            className={`fchip ${sel === g.id ? 'on' : ''}`}
+            onClick={() => setSel(g.id)}
+          >
+            {g.emoji} {g.name}
+          </button>
+        ))}
       </div>
 
-      <div className="tabs">
-        <button
-          className={tab === 'daily' ? 'tab active' : 'tab'}
-          onClick={() => setTab('daily')}
-        >
-          Today
-        </button>
-        <button
-          className={tab === 'all' ? 'tab active' : 'tab'}
-          onClick={() => setTab('all')}
-        >
-          Hall of Fame
-        </button>
-      </div>
+      {sel !== 'overall' && (
+        <div className="tabs">
+          <button className={`tab ${scope === 'today' ? 'active' : ''}`} onClick={() => setScope('today')}>
+            Today
+          </button>
+          <button className={`tab ${scope === 'all' ? 'active' : ''}`} onClick={() => setScope('all')}>
+            All time
+          </button>
+        </div>
+      )}
 
       {rows.length === 0 ? (
-        <p className="empty">No times yet. Be the first!</p>
+        <p className="empty">No scores yet. Go play!</p>
       ) : (
         <ol className="board-list">
           {rows.map((r, i) => (
-            <li
-              key={r.ts}
-              className={`board-row rank-${i + 1} ${r.name === me ? 'me' : ''}`}
-            >
-              <span className="rank">{medal(i)}</span>
+            <li key={(r.ts || r.name) + i} className={`board-row rank-${i + 1} ${r.name === me ? 'me' : ''}`}>
+              <span className="rank">{['🥇', '🥈', '🥉'][i] || i + 1}</span>
               <span className="lb-name">
                 {r.name}
                 {r.name === me && <span className="you-tag">you</span>}
               </span>
-              <span className="lb-meta">
-                {r.misses ? `${r.misses}✗` : '✓'}
-              </span>
-              <span className="lb-score">{fmt(r.netMs)}</span>
+              <span className="lb-score">{r.score}</span>
             </li>
           ))}
         </ol>
       )}
-
       <p className="muted small">
-        Ranked by net time. Scores are saved on this device — hook up a backend
-        for a shared board.
+        Scores saved on this device. Hook up a backend for a shared board.
       </p>
     </div>
   )
 }
 
-function medal(i) {
-  return ['🥇', '🥈', '🥉'][i] || i + 1
+/* ---------------------------- profile ----------------------------- */
+function Profile({ onChanged }) {
+  const p = getProfile()
+  const { lvl, cur, span, pct } = levelProgress(p.xp)
+  const [editing, setEditing] = useState(false)
+  const [name, setNameInput] = useState(p.name)
+
+  function save() {
+    if (name.trim()) {
+      setName(name)
+      setEditing(false)
+      onChanged()
+    }
+  }
+
+  const playedBest = GAMES.filter((g) => p.best[g.id] != null)
+
+  return (
+    <div className="profile fade-in">
+      <div className="avatar">{(p.name || 'P').slice(0, 1).toUpperCase()}</div>
+      {editing ? (
+        <div className="name-row">
+          <input className="name-input" value={name} maxLength={16} onChange={(e) => setNameInput(e.target.value)} />
+          <button className="primary-btn" onClick={save}>Save</button>
+        </div>
+      ) : (
+        <div className="pname" onClick={() => setEditing(true)}>
+          {p.name || 'Player'} <span className="edit">✎</span>
+        </div>
+      )}
+
+      <div className="lvl-line">Level {lvl}</div>
+      <div className="xpbar big"><span style={{ width: `${pct}%` }} /></div>
+      <div className="xp-cap">{cur} / {span} XP</div>
+
+      <div className="stat-row">
+        <div className="stat"><div className="stat-num">🔥 {p.streak}</div><div className="stat-label">day streak</div></div>
+        <div className="stat"><div className="stat-num">{p.plays}</div><div className="stat-label">games played</div></div>
+        <div className="stat"><div className="stat-num">{p.xp}</div><div className="stat-label">total XP</div></div>
+      </div>
+
+      <div className="section-head"><h2>Your best scores</h2></div>
+      {playedBest.length === 0 ? (
+        <p className="empty">Play a game to set your first score.</p>
+      ) : (
+        <div className="best-list">
+          {playedBest.map((g) => (
+            <div key={g.id} className="best-row">
+              <span className="br-emoji">{g.emoji}</span>
+              <span className="br-name">{g.name}</span>
+              <span className="br-score">{p.best[g.id]}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ---------------------------- name gate --------------------------- */
+function NameGate({ onSubmit, onClose }) {
+  const [name, setName] = useState('')
+  return (
+    <div className="modal-back" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-emoji">👋</div>
+        <h3>What should we call you?</h3>
+        <p className="muted">Shows up on the leaderboard. No sign-up, ever.</p>
+        <input
+          className="name-input big"
+          autoFocus
+          placeholder="Your name or roll no."
+          value={name}
+          maxLength={16}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && name.trim() && onSubmit(name)}
+        />
+        <button className="primary-btn big" disabled={!name.trim()} onClick={() => name.trim() && onSubmit(name)}>
+          Let's go →
+        </button>
+      </div>
+    </div>
+  )
 }

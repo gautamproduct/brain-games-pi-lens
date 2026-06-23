@@ -1,0 +1,133 @@
+// All persistence (localStorage). No accounts, no login.
+// Holds the player profile (name, XP, level, streak) and per-game leaderboards.
+
+import { todayKey } from './rng.js'
+
+const PROFILE_KEY = 'bg.profile'
+const SCORES_KEY = 'bg.scores'
+
+function read(key, fallback) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key))
+    return v == null ? fallback : v
+  } catch {
+    return fallback
+  }
+}
+function write(key, val) {
+  localStorage.setItem(key, JSON.stringify(val))
+}
+
+// ---------- profile / gamification ----------
+const FRESH = { name: '', xp: 0, streak: 0, lastDay: '', plays: 0, best: {} }
+
+export function getProfile() {
+  return { ...FRESH, ...read(PROFILE_KEY, {}) }
+}
+
+export function hasName() {
+  return !!getProfile().name
+}
+
+export function setName(name) {
+  const p = getProfile()
+  p.name = name.trim().slice(0, 16) || 'Player'
+  write(PROFILE_KEY, p)
+  return p
+}
+
+// XP curve: level N needs 50 * N^2 total xp.
+export function levelFromXp(xp) {
+  return Math.floor(Math.sqrt(xp / 50)) + 1
+}
+export function levelProgress(xp) {
+  const lvl = levelFromXp(xp)
+  const cur = 50 * (lvl - 1) ** 2
+  const next = 50 * lvl ** 2
+  return { lvl, cur: xp - cur, span: next - cur, pct: ((xp - cur) / (next - cur)) * 100 }
+}
+
+const yesterdayKey = () => {
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  return todayKey(d)
+}
+
+// Call once per finished game. Awards XP and keeps the daily streak alive.
+export function finishSession(gameId, score, xpGain) {
+  const p = getProfile()
+  const today = todayKey()
+  if (p.lastDay !== today) {
+    p.streak = p.lastDay === yesterdayKey() ? p.streak + 1 : 1
+    p.lastDay = today
+  }
+  p.xp += Math.max(0, Math.round(xpGain))
+  p.plays += 1
+  if (!p.best[gameId] || score > p.best[gameId]) p.best[gameId] = score
+  write(PROFILE_KEY, p)
+  return p
+}
+
+// ---------- leaderboards ----------
+export function recordScore(gameId, score, summary) {
+  const name = getProfile().name || 'Player'
+  const rows = read(SCORES_KEY, [])
+  rows.push({ gameId, name, score, summary, day: todayKey(), ts: Date.now() })
+  write(SCORES_KEY, rows)
+}
+
+// best score per name for a game, today or all-time
+export function getBoard(gameId, scope = 'today') {
+  const rows = read(SCORES_KEY, []).filter((r) => r.gameId === gameId)
+  const filtered = scope === 'today' ? rows.filter((r) => r.day === todayKey()) : rows
+  const best = new Map()
+  for (const r of filtered) {
+    const prev = best.get(r.name)
+    if (!prev || r.score > prev.score) best.set(r.name, r)
+  }
+  return [...best.values()].sort((a, b) => b.score - a.score).slice(0, 20)
+}
+
+// overall board: total of each player's best score across all games
+export function getOverallBoard() {
+  const profiles = new Map()
+  const rows = read(SCORES_KEY, [])
+  const bestByNameGame = new Map()
+  for (const r of rows) {
+    const k = r.name + '|' + r.gameId
+    if (!bestByNameGame.has(k) || r.score > bestByNameGame.get(k)) {
+      bestByNameGame.set(k, r.score)
+    }
+  }
+  for (const [k, score] of bestByNameGame) {
+    const name = k.split('|')[0]
+    profiles.set(name, (profiles.get(name) || 0) + score)
+  }
+  return [...profiles.entries()]
+    .map(([name, total]) => ({ name, score: total }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20)
+}
+
+export function myName() {
+  return getProfile().name || 'Player'
+}
+
+// game ids the current player has already completed today (for "done" ticks)
+export function playedTodayIds() {
+  const me = myName()
+  const today = todayKey()
+  const s = new Set()
+  for (const r of read(SCORES_KEY, [])) {
+    if (r.day === today && r.name === me) s.add(r.gameId)
+  }
+  return s
+}
+
+// the player's rank (1-based) in today's board for a game, or null
+export function myRankToday(gameId) {
+  const me = myName()
+  const board = getBoard(gameId, 'today')
+  const i = board.findIndex((r) => r.name === me)
+  return i === -1 ? null : i + 1
+}
