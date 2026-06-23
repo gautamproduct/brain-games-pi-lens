@@ -531,3 +531,20 @@ body {
 .board-loading { text-align: center; color: var(--muted); padding: 26px 0; }
 
 .share-invite { margin-bottom: 14px; }
+
+/* ---------- clean, contained look on larger screens ---------- */
+@media (min-width: 560px) {
+  body { padding: 22px 0; }
+  .app {
+    margin: 0 auto;
+    min-height: calc(100vh - 44px);
+    border: 1px solid var(--line);
+    border-radius: 28px;
+    box-shadow: 0 30px 80px -34px #000;
+    background: rgba(255, 255, 255, 0.015);
+  }
+  .session { border-radius: 28px; overflow: hidden; }
+}
+/* tidy leaderboard spacing */
+.your-card { padding: 12px 14px; }
+.ranks .chip-scroll { margin-top: 4px; }
