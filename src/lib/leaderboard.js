@@ -25,7 +25,6 @@ export async function gameBoard(gameId, scope = 'today') {
   const rows = await sbSelect(
     `plays?select=user_id,name,score&game_id=eq.${gameId}${f}&order=score.desc&limit=600`,
   )
-  if (!rows.length) return mapLocal(getBoard(gameId, scope)) // policy not set yet / empty
   const me = getUserId()
   return bestPerUser(rows)
     .sort((a, b) => b.score - a.score)
@@ -38,7 +37,6 @@ export async function overallBoard(scope = 'today') {
   if (!supabaseEnabled) return mapLocal(getOverallBoard())
   const f = scope === 'today' ? `day=eq.${todayKey()}&` : ''
   const rows = await sbSelect(`plays?select=user_id,name,game_id,score&${f}order=score.desc&limit=4000`)
-  if (!rows.length) return mapLocal(getOverallBoard())
   const bestNG = new Map() // uid|game -> {name,score}
   for (const r of rows) {
     const uid = r.user_id || r.name

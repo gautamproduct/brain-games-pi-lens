@@ -17,6 +17,7 @@ import {
 import { gameBoard, overallBoard, myDailyRank } from './lib/leaderboard.js'
 import { logPlay, supabaseEnabled } from './lib/supabase.js'
 import { shareResult, shareInvite } from './lib/share.js'
+import { confetti } from './lib/confetti.js'
 
 const PI_LENS_URL = 'https://play.google.com/store/apps/details?id=live.pw.pilens'
 
@@ -253,6 +254,8 @@ function LockedView({ game, onRanks, onExit }) {
 
 function ResultView({ game, result, onRanks, onExit }) {
   const [board, setBoard] = useState(null) // null = loading
+
+  useEffect(() => { confetti() }, []) // sweet little celebration
 
   useEffect(() => {
     let alive = true
