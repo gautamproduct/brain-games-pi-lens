@@ -241,8 +241,8 @@ function LockedView({ game, onRanks, onExit }) {
       <div className="result-emoji">✅</div>
       <h2 className="locked-title">Done for today</h2>
       <p className="muted">
-        You've used both of today's tries at <b>{game.name}</b>
-        {p.best[game.id] != null ? <> · best {p.best[game.id]}</> : null}.
+        You've already played <b>{game.name}</b> today
+        {p.best[game.id] != null ? <> · scored {p.best[game.id]}</> : null}.
       </p>
       <p className="locked-sub">A fresh challenge unlocks tomorrow. Try another game meanwhile!</p>
       <button className="primary-btn big" onClick={onRanks}>🏆 View ranks</button>

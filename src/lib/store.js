@@ -39,7 +39,7 @@ const PROFILE_KEY = 'bg.profile'
 const SCORES_KEY = 'bg.scores'
 const UID_KEY = 'bg.uid'
 
-export const DAILY_LIMIT = 2 // attempts per game per day
+export const DAILY_LIMIT = 1 // attempts per game per day
 
 // stable pseudo-anonymous id for this device (used for Supabase logging)
 export function getUserId() {
