@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { ri, shuffle } from '../lib/rng.js'
+import { useCountdown } from '../lib/useCountdown.js'
 
 // Single digits flash one at a time — add them up, then pick the total.
 const ROUNDS = 10
+const ANSWER_MS = 6000
 
 export default function NumberFlash({ rng, onFinish }) {
   const [round, setRound] = useState(1)
@@ -67,6 +69,10 @@ export default function NumberFlash({ rng, onFinish }) {
     }, 750)
   }
 
+  // a ticking clock to answer each round (running only while choosing)
+  const left = useCountdown(ANSWER_MS, phase === 'answer' && !fb, () => answer(-1))
+  const low = left <= 2500
+
   return (
     <div className="gf">
       <div className="gf-hud">
@@ -84,6 +90,7 @@ export default function NumberFlash({ rng, onFinish }) {
 
       {phase === 'answer' ? (
         <>
+          <div className="timebar"><div className={`timebar-fill ${low ? 'low' : ''}`} style={{ width: `${(left / ANSWER_MS) * 100}%` }} /></div>
           <div className="nf-ask">What's the total?</div>
           <div className="opt-grid">
             {opts.map((v) => (

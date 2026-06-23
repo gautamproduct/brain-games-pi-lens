@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react'
 import { ri, pick, shuffle } from '../lib/rng.js'
+import { useCountdown } from '../lib/useCountdown.js'
 
 // A cross of equations with one missing number. Fill it so the row AND
-// column it sits in both work out. 5 puzzles.
+// column it sits in both work out. 5 puzzles against a 50s clock.
 const PUZZLES = 5
+const TOTAL = 50000
 
 const apply = (a, op, b) => (op === '+' ? a + b : op === '−' ? a - b : a * b)
 
@@ -42,20 +44,24 @@ export default function CrossMath({ rng, onFinish }) {
   const [p, setP] = useState(() => genPuzzle(rng))
   const [fb, setFb] = useState(null)
   const correctRef = useRef(0)
+  const doneRef = useRef(false)
+
+  function finish() {
+    if (doneRef.current) return
+    doneRef.current = true
+    onFinish({ score: correctRef.current, summary: `${correctRef.current}/${PUZZLES} solved` })
+  }
+  const left = useCountdown(TOTAL, true, finish)
+  const low = left <= 8000
 
   function answer(v) {
-    if (fb) return
+    if (fb || doneRef.current) return
     const ok = v === p.ans
     if (ok) correctRef.current += 1
     setFb({ v, ok })
     setTimeout(() => {
-      if (i + 1 >= PUZZLES) {
-        onFinish({ score: correctRef.current, summary: `${correctRef.current}/${PUZZLES} solved` })
-      } else {
-        setI(i + 1)
-        setP(genPuzzle(rng))
-        setFb(null)
-      }
+      if (i + 1 >= PUZZLES) finish()
+      else { setI(i + 1); setP(genPuzzle(rng)); setFb(null) }
     }, 750)
   }
 
@@ -74,16 +80,15 @@ export default function CrossMath({ rng, onFinish }) {
     <div className="gf">
       <div className="gf-hud">
         <div className="hud-chip">
-          <span className="hud-k">PUZZLE</span>
-          <b className="grad">
-            {i + 1}/{PUZZLES}
-          </b>
+          <span className="hud-k">PUZZLE {i + 1}/{PUZZLES}</span>
+          <b className="grad">{correctRef.current}</b>
         </div>
         <div className="hud-chip right">
-          <b>{correctRef.current}</b>
-          <span className="hud-k">solved</span>
+          <b className={`hud-time ${low ? 'low' : ''}`}>{(left / 1000).toFixed(0)}s</b>
+          <span className="hud-k">time left</span>
         </div>
       </div>
+      <div className="timebar"><div className={`timebar-fill ${low ? 'low' : ''}`} style={{ width: `${(left / TOTAL) * 100}%` }} /></div>
 
       <div className="cm-wrap">
         <div className="cmgrid">

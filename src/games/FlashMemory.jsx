@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { shuffle } from '../lib/rng.js'
+import { useCountdown } from '../lib/useCountdown.js'
 
 // Memory Matrix: several tiles light up AT ONCE for a moment, then hide.
-// Tap exactly those tiles. Each level lights one more. Miss one → run ends.
+// Tap exactly those tiles before the clock runs out. Miss one → run ends.
 const SIZE = 4
 const N = SIZE * SIZE
 
@@ -13,6 +14,19 @@ export default function FlashMemory({ rng, onFinish }) {
   const [found, setFound] = useState([])
   const [wrong, setWrong] = useState(-1)
   const litSet = useRef(new Set())
+  const doneRef = useRef(false)
+
+  function end() {
+    if (doneRef.current) return
+    doneRef.current = true
+    setPhase('over')
+    setTimeout(() => onFinish({ score: level - 1, summary: `reached level ${level}` }), 700)
+  }
+
+  // time to tap them: more tiles → a little more time
+  const pickMs = 2200 + lit.length * 900
+  const left = useCountdown(pickMs, phase === 'pick', end)
+  const low = left <= 2000
 
   useEffect(() => {
     const count = Math.min(level + 2, N - 3) // 3,4,5… lit tiles
@@ -39,11 +53,7 @@ export default function FlashMemory({ rng, onFinish }) {
       }
     } else {
       setWrong(i)
-      setPhase('over')
-      setTimeout(
-        () => onFinish({ score: level - 1, summary: `reached level ${level}` }),
-        850,
-      )
+      end()
     }
   }
 
@@ -67,6 +77,9 @@ export default function FlashMemory({ rng, onFinish }) {
       <div className="mm-status">
         {showing ? '👀 remember the lit tiles' : phase === 'over' ? 'missed!' : 'now tap them'}
       </div>
+      {phase === 'pick' && (
+        <div className="timebar"><div className={`timebar-fill ${low ? 'low' : ''}`} style={{ width: `${(left / pickMs) * 100}%` }} /></div>
+      )}
 
       <div className="memgrid mm">
         {Array.from({ length: N }, (_, i) => {

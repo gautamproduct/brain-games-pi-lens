@@ -10,6 +10,20 @@ const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabaseEnabled = !!(URL && KEY)
 
+// Read helper (GET). Returns [] on any failure (e.g. no SELECT policy yet).
+export async function sbSelect(path) {
+  if (!supabaseEnabled) return []
+  try {
+    const r = await fetch(`${URL}/rest/v1/${path}`, {
+      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
+    })
+    if (!r.ok) return []
+    return await r.json()
+  } catch {
+    return []
+  }
+}
+
 // Fire-and-forget: records that a user played a game on a given day.
 export async function logPlay({ userId, name, gameId, score }) {
   if (!supabaseEnabled) return

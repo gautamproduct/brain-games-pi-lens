@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Logo from './Logo.jsx'
 import { GAMES, featuredGame } from './games/index.js'
 import { dailyRng, todayKey } from './lib/rng.js'
@@ -8,25 +8,31 @@ import {
   setName,
   finishSession,
   recordScore,
-  getBoard,
-  getOverallBoard,
   levelProgress,
   myName,
   playedTodayCount,
-  myRankToday,
   getUserId,
   DAILY_LIMIT,
 } from './lib/store.js'
-import { logPlay } from './lib/supabase.js'
+import { gameBoard, overallBoard, myDailyRank } from './lib/leaderboard.js'
+import { logPlay, supabaseEnabled } from './lib/supabase.js'
 import { shareResult } from './lib/share.js'
 
 const PI_LENS_URL = 'https://play.google.com/store/apps/details?id=live.pw.pilens'
 
 export default function App() {
-  const [tab, setTab] = useState('home') // home | ranks | profile
+  const [tab, setTab] = useState('home') // home | ranks
   const [session, setSession] = useState(null) // { game, locked }
-  const [, force] = useState(0)
+  const [tick, force] = useState(0)
   const refresh = () => force((n) => n + 1)
+  const [rank, setRank] = useState(null)
+
+  // keep the top-right rank badge in sync
+  useEffect(() => {
+    let alive = true
+    myDailyRank().then((r) => alive && setRank(r)).catch(() => {})
+    return () => { alive = false }
+  }, [tick])
 
   function launch(game) {
     const locked = playedTodayCount(game.id) >= DAILY_LIMIT
@@ -40,12 +46,11 @@ export default function App() {
 
   return (
     <div className="app">
-      <Header onProfile={() => setTab('profile')} />
+      <Header rank={rank} onOpen={() => setTab('ranks')} />
 
       <main className="stage">
         {tab === 'home' && <Home onPlay={launch} />}
-        {tab === 'ranks' && <Ranks onBack={() => setTab('home')} />}
-        {tab === 'profile' && <Profile onBack={() => setTab('home')} onChanged={refresh} />}
+        {tab === 'ranks' && <Ranks onBack={() => setTab('home')} onChanged={refresh} />}
       </main>
 
       {session && (
@@ -65,7 +70,7 @@ export default function App() {
 }
 
 /* ----------------------------- header ----------------------------- */
-function Header({ onProfile }) {
+function Header({ rank, onOpen }) {
   const p = getProfile()
   const { lvl, pct } = levelProgress(p.xp)
   return (
@@ -79,10 +84,10 @@ function Header({ onProfile }) {
           </a>
         </div>
       </div>
-      <button className="streak-chip" onClick={onProfile}>
+      <button className="streak-chip" onClick={onOpen} title="Leaderboards">
         <span className="flame">🔥</span>
         <b>{p.streak}</b>
-        <span className="lvl-mini">Lv {lvl}</span>
+        <span className="lvl-mini">{rank ? `#${rank} today` : `Lv ${lvl}`}</span>
         <span className="xpbar"><span style={{ width: `${pct}%` }} /></span>
       </button>
     </header>
@@ -164,7 +169,7 @@ function Session({ game, locked, onExit, onRanks }) {
     finishSession(game.id, score, xpGain)
     recordScore(game.id, score, summary)
     logPlay({ userId: getUserId(), name: myName(), gameId: game.id, score })
-    setResult({ score, summary, xpGain, rank: myRankToday(game.id) })
+    setResult({ score, summary, xpGain })
   }
 
   // rules first → Start → ask name (only if not set) → play
@@ -247,8 +252,26 @@ function LockedView({ game, onRanks, onExit }) {
 }
 
 function ResultView({ game, result, onRanks, onExit }) {
-  const board = useMemo(() => getBoard(game.id, 'today'), [game.id])
-  const me = myName()
+  const [board, setBoard] = useState(null) // null = loading
+
+  useEffect(() => {
+    let alive = true
+    gameBoard(game.id, 'today').then((b) => {
+      if (!alive) return
+      // reflect my just-played score immediately (Supabase write may lag a moment)
+      const uid = getUserId()
+      const others = b.filter((r) => !r.me)
+      const mine = b.find((r) => r.me)
+      const myScore = Math.max(result.score, mine ? mine.score : 0)
+      const merged = [...others, { name: myName(), score: myScore, uid, me: true }]
+      merged.sort((a, x) => x.score - a.score)
+      setBoard(merged.slice(0, 8))
+    })
+    return () => { alive = false }
+  }, [game.id])
+
+  const rank = board ? (board.findIndex((r) => r.me) + 1 || null) : null
+
   return (
     <div className="result fade-in">
       <div className="result-emoji">{game.emoji}</div>
@@ -256,18 +279,22 @@ function ResultView({ game, result, onRanks, onExit }) {
       <div className="result-sum">{result.summary}</div>
       <div className="result-chips">
         <span className="rchip xp">+{result.xpGain} XP</span>
-        {result.rank && <span className="rchip rank">#{result.rank} today</span>}
+        {rank && <span className="rchip rank">#{rank} today</span>}
       </div>
 
       <div className="mini-board">
         <div className="mb-head">Today · {game.name}</div>
-        {board.slice(0, 5).map((r, i) => (
-          <div key={r.ts} className={`mb-row ${r.name === me ? 'me' : ''}`}>
-            <span className="mb-rank">{['🥇', '🥈', '🥉'][i] || i + 1}</span>
-            <span className="mb-name">{r.name}</span>
-            <span className="mb-score">{r.score}</span>
-          </div>
-        ))}
+        {board === null ? (
+          <div className="mb-row"><span className="mb-name" style={{ color: 'var(--muted)' }}>loading…</span></div>
+        ) : (
+          board.slice(0, 5).map((r, i) => (
+            <div key={r.uid + '' + i} className={`mb-row ${r.me ? 'me' : ''}`}>
+              <span className="mb-rank">{['🥇', '🥈', '🥉'][i] || i + 1}</span>
+              <span className="mb-name">{r.name}</span>
+              <span className="mb-score">{r.score}</span>
+            </div>
+          ))
+        )}
       </div>
 
       <button className="primary-btn big" onClick={() => shareResult(game, result)}>
@@ -280,17 +307,60 @@ function ResultView({ game, result, onRanks, onExit }) {
 }
 
 /* ----------------------------- ranks ------------------------------ */
-function Ranks({ onBack }) {
+function Ranks({ onBack, onChanged }) {
   const [sel, setSel] = useState('overall')
   const [scope, setScope] = useState('today')
-  const me = myName()
-  const rows = sel === 'overall' ? getOverallBoard() : getBoard(sel, scope)
+  const [rows, setRows] = useState(null) // null = loading
+  const [rank, setRank] = useState(null)
+  const p = getProfile()
+  const { lvl } = levelProgress(p.xp)
+  const [editing, setEditing] = useState(false)
+  const [nameInput, setNameInput] = useState(p.name)
+
+  useEffect(() => {
+    let alive = true
+    setRows(null)
+    const fetcher = sel === 'overall' ? overallBoard(scope) : gameBoard(sel, scope)
+    fetcher.then((r) => alive && setRows(r))
+    return () => { alive = false }
+  }, [sel, scope])
+
+  useEffect(() => {
+    let alive = true
+    myDailyRank().then((r) => alive && setRank(r)).catch(() => {})
+    return () => { alive = false }
+  }, [])
+
+  function saveName() {
+    if (!nameInput.trim()) return
+    setName(nameInput)
+    setEditing(false)
+    onChanged && onChanged()
+  }
 
   return (
     <div className="ranks fade-in">
       <div className="board-head">
         <h2>🏆 Leaderboards</h2>
         <button className="ghost-btn" onClick={onBack}>← Back</button>
+      </div>
+
+      <div className="your-card">
+        <div className="yc-av">{(p.name || 'P').slice(0, 1).toUpperCase()}</div>
+        <div className="yc-main">
+          {editing ? (
+            <div className="name-row">
+              <input className="name-input" value={nameInput} maxLength={16} onChange={(e) => setNameInput(e.target.value)} />
+              <button className="primary-btn" onClick={saveName}>Save</button>
+            </div>
+          ) : (
+            <>
+              <div className="yc-name">{p.name || 'Player'} <span className="edit" onClick={() => setEditing(true)}>✎</span></div>
+              <div className="yc-sub">🔥 {p.streak} day streak · Lv {lvl} · {p.xp} XP</div>
+            </>
+          )}
+        </div>
+        <div className="yc-rank"><b>{rank ? `#${rank}` : '—'}</b><span>today</span></div>
       </div>
 
       <div className="chip-scroll">
@@ -309,23 +379,27 @@ function Ranks({ onBack }) {
         </div>
       )}
 
-      {rows.length === 0 ? (
-        <p className="empty">No scores yet. Go play!</p>
+      {rows === null ? (
+        <p className="board-loading">Loading ranks…</p>
+      ) : rows.length === 0 ? (
+        <p className="empty">No scores yet. Be the first!</p>
       ) : (
         <ol className="board-list">
           {rows.map((r, i) => (
-            <li key={(r.ts || r.name) + '' + i} className={`board-row rank-${i + 1} ${r.name === me ? 'me' : ''}`}>
+            <li key={r.uid + '' + i} className={`board-row rank-${i + 1} ${r.me ? 'me' : ''}`}>
               <span className="rank">{['🥇', '🥈', '🥉'][i] || i + 1}</span>
               <span className="lb-name">
                 {r.name}
-                {r.name === me && <span className="you-tag">you</span>}
+                {r.me && <span className="you-tag">you</span>}
               </span>
               <span className="lb-score">{r.score}</span>
             </li>
           ))}
         </ol>
       )}
-      <p className="muted small">Ranks update daily · saved on this device.</p>
+      <p className="muted small">
+        {supabaseEnabled ? '🌐 Live leaderboard · synced across all players' : 'Saved on this device.'}
+      </p>
     </div>
   )
 }

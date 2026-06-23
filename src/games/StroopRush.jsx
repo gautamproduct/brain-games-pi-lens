@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
 import { ri, pick } from '../lib/rng.js'
+import { useCountdown } from '../lib/useCountdown.js'
 
-// Tap the INK colour, not the word. 10 questions. Score = correct answers.
+// Tap the INK colour, not the word. 10 questions against a 35s clock.
 const QS = 10
+const TOTAL = 35000
 
 const COLORS = [
   { id: 'red', label: 'Red', hex: '#ff5d6c' },
@@ -29,43 +31,39 @@ export default function StroopRush({ rng, onFinish }) {
   const [round, setRound] = useState(makeRound)
   const [fb, setFb] = useState(null)
   const correctRef = useRef(0)
+  const doneRef = useRef(false)
+
+  function finish() {
+    if (doneRef.current) return
+    doneRef.current = true
+    onFinish({ score: correctRef.current, summary: `${correctRef.current}/${QS} correct` })
+  }
+  const left = useCountdown(TOTAL, true, finish)
+  const low = left <= 6000
 
   function answer(c) {
-    if (fb) return
+    if (fb || doneRef.current) return
     const ok = c.id === round.ink.id
     if (ok) correctRef.current += 1
     setFb(ok ? 'good' : 'bad')
     setTimeout(() => {
-      if (i + 1 >= QS) {
-        onFinish({ score: correctRef.current, summary: `${correctRef.current}/${QS} correct` })
-      } else {
-        setI(i + 1)
-        setRound(makeRound())
-        setFb(null)
-      }
+      if (i + 1 >= QS) finish()
+      else { setI(i + 1); setRound(makeRound()); setFb(null) }
     }, 300)
   }
 
   return (
     <div className="gf">
       <div className="gf-hud">
-        <div className="hud-chip">
-          <span className="hud-k">QUESTION</span>
-          <b className="grad">{i + 1}/{QS}</b>
-        </div>
-        <div className="hud-chip right">
-          <b>{correctRef.current}</b>
-          <span className="hud-k">correct</span>
-        </div>
+        <div className="hud-chip"><span className="hud-k">Q {i + 1}/{QS}</span><b className="grad">{correctRef.current}</b></div>
+        <div className="hud-chip right"><b className={`hud-time ${low ? 'low' : ''}`}>{(left / 1000).toFixed(0)}s</b><span className="hud-k">time left</span></div>
       </div>
+      <div className="timebar"><div className={`timebar-fill ${low ? 'low' : ''}`} style={{ width: `${(left / TOTAL) * 100}%` }} /></div>
 
       <div className={`stroop-word-wrap ${fb || ''}`}>
-        <div className="stroop-word" style={{ color: round.ink.hex }}>
-          {round.word.label}
-        </div>
+        <div className="stroop-word" style={{ color: round.ink.hex }}>{round.word.label}</div>
         <div className="stroop-hint">tap the INK colour</div>
       </div>
-
       <div className="opt-grid">
         {round.opts.map((c) => (
           <button key={c.id} className="opt-btn" onClick={() => answer(c)}>

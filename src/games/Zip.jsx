@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { shuffle } from '../lib/rng.js'
 
 // Draw one continuous path through every cell, passing the numbered dots
@@ -63,9 +63,18 @@ export default function Zip({ rng, onFinish }) {
   const [nextCp, setNextCp] = useState(2)
   const [bad, setBad] = useState(-1)
   const [hint, setHint] = useState(-1)
+  const [elapsed, setElapsed] = useState(0)
   const startRef = useRef(performance.now())
   const dragging = useRef(false)
   const gridRef = useRef(null)
+  const doneRef = useRef(false)
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (!doneRef.current) setElapsed(performance.now() - startRef.current)
+    }, 250)
+    return () => clearInterval(t)
+  }, [])
 
   const head = path[path.length - 1]
   const inPath = new Set(path)
@@ -96,6 +105,7 @@ export default function Zip({ rng, onFinish }) {
     setNextCp(nc)
     setHint(-1)
     if (np.length === TOTAL && nc > K) {
+      doneRef.current = true
       const sec = (performance.now() - startRef.current) / 1000
       setTimeout(
         () =>
@@ -158,7 +168,7 @@ export default function Zip({ rng, onFinish }) {
         </div>
       </div>
 
-      <div className="zip-hint-line">Fill every cell in one path · hit 1→{K} in order</div>
+      <div className="zip-hint-line">⏱ {(elapsed / 1000).toFixed(0)}s · faster = higher score · hit 1→{K} in order</div>
 
       <div
         className="zipgrid"

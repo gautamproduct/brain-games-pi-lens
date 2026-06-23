@@ -507,3 +507,25 @@ body {
   background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
 }
 .game-card { border-radius: 20px; box-shadow: 0 10px 26px -16px #000; }
+
+/* ---------- game countdown bar ---------- */
+.timebar { height: 8px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; margin: 2px 0 16px; }
+.timebar-fill { height: 100%; background: linear-gradient(90deg, var(--g2,#00d4ff), var(--g1,#7c5cff)); transition: width .25s linear; }
+.timebar-fill.low { background: linear-gradient(90deg, #ff5d6c, #ffb24a); }
+.hud-time.low { color: var(--bad); }
+
+/* ---------- ranks: your card + states ---------- */
+.your-card {
+  display: flex; align-items: center; gap: 12px; padding: 14px; margin-bottom: 14px;
+  border: 1px solid rgba(124,92,255,.3); border-radius: 18px;
+  background: linear-gradient(135deg, rgba(0,212,255,.12), rgba(124,92,255,.16));
+}
+.yc-av { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 20px; color: #08101e; background: linear-gradient(135deg, var(--brand-2), var(--brand)); flex: 0 0 auto; }
+.yc-main { flex: 1; min-width: 0; }
+.yc-name { font-weight: 800; font-size: 16px; display: flex; align-items: center; gap: 6px; }
+.yc-name .edit { font-size: 13px; color: var(--muted); cursor: pointer; }
+.yc-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.yc-rank { text-align: right; flex: 0 0 auto; }
+.yc-rank b { font-size: 24px; font-weight: 900; background: linear-gradient(135deg, var(--brand-2), var(--brand)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.yc-rank span { display: block; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.board-loading { text-align: center; color: var(--muted); padding: 26px 0; }
