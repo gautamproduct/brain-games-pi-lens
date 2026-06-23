@@ -72,6 +72,79 @@ function makeCard(game, result) {
   })
 }
 
+function makeInviteCard() {
+  return new Promise((resolve) => {
+    const S = 1080
+    const c = document.createElement('canvas')
+    c.width = S
+    c.height = S
+    const ctx = c.getContext('2d')
+
+    const bg = ctx.createLinearGradient(0, 0, S, S)
+    bg.addColorStop(0, '#141d3a')
+    bg.addColorStop(1, '#0a0712')
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, S, S)
+
+    // glowing ring (logo nod)
+    ctx.save()
+    ctx.translate(S / 2, 360)
+    const ring = ctx.createLinearGradient(-110, 110, 110, -110)
+    ring.addColorStop(0, '#00e6ff')
+    ring.addColorStop(1, '#7b6cff')
+    ctx.strokeStyle = ring
+    ctx.lineWidth = 46
+    ctx.shadowColor = 'rgba(0,212,255,0.5)'
+    ctx.shadowBlur = 40
+    ctx.beginPath()
+    ctx.arc(0, 0, 120, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.restore()
+
+    ctx.textAlign = 'center'
+    ctx.shadowBlur = 0
+    ctx.fillStyle = '#eef2ff'
+    ctx.font = '900 92px Inter, system-ui, sans-serif'
+    ctx.fillText('Brain Games', S / 2, 600)
+    ctx.fillStyle = '#00d4ff'
+    ctx.font = '700 44px Inter, system-ui, sans-serif'
+    ctx.fillText('By: Pi Lens App', S / 2, 662)
+
+    ctx.font = '90px serif'
+    ctx.fillText('🔢 🎨 🧠 ➕ ⚡ ⚖️ ✖️ 🧩', S / 2, 790)
+
+    ctx.fillStyle = '#b9c2ff'
+    ctx.font = '600 42px Inter, system-ui, sans-serif'
+    ctx.fillText('8 free brain games · new daily challenge', S / 2, 880)
+    ctx.fillStyle = '#8b96b5'
+    ctx.font = '700 38px Inter, system-ui, sans-serif'
+    ctx.fillText(SITE.replace('https://', ''), S / 2, 960)
+
+    c.toBlob((b) => resolve(b), 'image/png')
+  })
+}
+
+export async function shareInvite() {
+  const text = `Hey, try this exciting brain game: ${SITE}`
+  try {
+    const blob = await makeInviteCard()
+    if (blob) {
+      const file = new File([blob], 'brain-games.png', { type: 'image/png' })
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], text })
+        return
+      }
+    }
+    if (navigator.share) {
+      await navigator.share({ text })
+      return
+    }
+  } catch {
+    // cancelled / unsupported — fall through
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+}
+
 export async function shareResult(game, result) {
   const text = `I scored ${result.score} on ${game.name} 🧠 in Brain Games by Pi Lens!\nBeat me 👉 ${SITE}`
   try {

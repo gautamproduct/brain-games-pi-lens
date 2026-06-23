@@ -529,3 +529,5 @@ body {
 .yc-rank b { font-size: 24px; font-weight: 900; background: linear-gradient(135deg, var(--brand-2), var(--brand)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .yc-rank span { display: block; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
 .board-loading { text-align: center; color: var(--muted); padding: 26px 0; }
+
+.share-invite { margin-bottom: 14px; }

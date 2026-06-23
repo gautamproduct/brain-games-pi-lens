@@ -16,7 +16,7 @@ import {
 } from './lib/store.js'
 import { gameBoard, overallBoard, myDailyRank } from './lib/leaderboard.js'
 import { logPlay, supabaseEnabled } from './lib/supabase.js'
-import { shareResult } from './lib/share.js'
+import { shareResult, shareInvite } from './lib/share.js'
 
 const PI_LENS_URL = 'https://play.google.com/store/apps/details?id=live.pw.pilens'
 
@@ -362,6 +362,10 @@ function Ranks({ onBack, onChanged }) {
         </div>
         <div className="yc-rank"><b>{rank ? `#${rank}` : '—'}</b><span>today</span></div>
       </div>
+
+      <button className="secondary-btn big share-invite" onClick={shareInvite}>
+        📤 Share &amp; challenge friends
+      </button>
 
       <div className="chip-scroll">
         <button className={`fchip ${sel === 'overall' ? 'on' : ''}`} onClick={() => setSel('overall')}>⭐ Overall</button>
