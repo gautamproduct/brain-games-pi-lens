@@ -152,8 +152,15 @@ export const RIVAL_RANGE = {
 
 export const gameById = (id) => GAMES.find((g) => g.id === id)
 
-// today's featured "Daily Challenge" rotates through the list by date
+// Pin specific dates to a chosen game; every other day rotates automatically.
+const FEATURED_OVERRIDES = {
+  '2026-06-23': 'flash', // today → Flash Memory
+}
+
+// today's featured "Daily Challenge": pinned if set, else rotates by date
 export function featuredGame(dateKey) {
+  const pin = FEATURED_OVERRIDES[dateKey]
+  if (pin) return GAMES.find((g) => g.id === pin) || GAMES[0]
   let h = 0
   for (let i = 0; i < dateKey.length; i++) h = (h * 31 + dateKey.charCodeAt(i)) >>> 0
   return GAMES[h % GAMES.length]
