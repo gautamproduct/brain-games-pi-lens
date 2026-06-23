@@ -1,7 +1,7 @@
 // Build a square result card on a canvas and share it via the native share
 // sheet (WhatsApp, etc.). Falls back to a WhatsApp text link.
 
-const SITE = 'https://gautamproduct.github.io/brain-games-pi-lens/'
+const SITE = 'https://brain-games-pi-lens.netlify.app/'
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath()
