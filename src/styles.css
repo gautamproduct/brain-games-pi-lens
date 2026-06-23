@@ -550,3 +550,17 @@ body {
 .ranks .chip-scroll { margin-top: 4px; }
 
 .bigq { letter-spacing: 3px; }
+
+/* ---------- leaderboard spacing polish ---------- */
+.ranks .board-head { flex-wrap: nowrap; gap: 10px; margin-bottom: 14px; }
+.ranks .board-head h2 { font-size: 20px; flex: 1; min-width: 0; }
+.ranks .board-head .ghost-btn { flex: 0 0 auto; }
+.ranks .your-card { margin: 0 0 12px; padding: 13px 15px; }
+.ranks .share-invite { margin: 0 0 14px; }
+.ranks .chip-scroll { margin: 0 0 14px; padding-bottom: 4px; }
+.ranks .tabs { margin: 0 0 12px; }
+.ranks .board-list { gap: 9px; }
+.ranks .board-row { padding: 12px 16px; }
+.ranks .board-row .rank { font-size: 16px; }
+.ranks .board-row .lb-name { font-size: 14.5px; }
+.ranks .muted.small { margin-top: 18px; padding-bottom: 4px; }
