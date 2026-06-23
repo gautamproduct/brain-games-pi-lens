@@ -12,34 +12,25 @@ import {
   getOverallBoard,
   levelProgress,
   myName,
-  playedTodayIds,
+  playedTodayCount,
   myRankToday,
+  getUserId,
+  DAILY_LIMIT,
 } from './lib/store.js'
+import { logPlay } from './lib/supabase.js'
+import { shareResult } from './lib/share.js'
 
 const PI_LENS_URL = 'https://play.google.com/store/apps/details?id=live.pw.pilens'
 
 export default function App() {
   const [tab, setTab] = useState('home') // home | ranks | profile
   const [session, setSession] = useState(null) // { game, locked }
-  const [pending, setPending] = useState(null)
   const [, force] = useState(0)
   const refresh = () => force((n) => n + 1)
 
   function launch(game) {
-    if (!hasName()) {
-      setPending(game)
-      return
-    }
-    const locked = playedTodayIds().has(game.id)
+    const locked = playedTodayCount(game.id) >= DAILY_LIMIT
     setSession({ game, locked })
-  }
-
-  function onNamed(name) {
-    setName(name)
-    const g = pending
-    setPending(null)
-    if (g) setSession({ game: g, locked: playedTodayIds().has(g.id) })
-    refresh()
   }
 
   function closeSession() {
@@ -52,12 +43,11 @@ export default function App() {
       <Header onProfile={() => setTab('profile')} />
 
       <main className="stage">
-        {tab === 'home' && <Home onPlay={launch} onRanks={() => setTab('ranks')} />}
+        {tab === 'home' && <Home onPlay={launch} />}
         {tab === 'ranks' && <Ranks onBack={() => setTab('home')} />}
         {tab === 'profile' && <Profile onBack={() => setTab('home')} onChanged={refresh} />}
       </main>
 
-      {pending && <NameGate onSubmit={onNamed} onClose={() => setPending(null)} />}
       {session && (
         <Session
           game={session.game}
@@ -100,18 +90,21 @@ function Header({ onProfile }) {
 }
 
 /* ------------------------------ home ------------------------------ */
-function Home({ onPlay, onRanks }) {
-  const done = playedTodayIds() // recompute each render so ✓ ticks update
+function Home({ onPlay }) {
   const featured = featuredGame(todayKey())
   const p = getProfile()
+  const plays = Object.fromEntries(GAMES.map((g) => [g.id, playedTodayCount(g.id)]))
+
+  const foot = (g) => {
+    const n = plays[g.id]
+    if (n >= DAILY_LIMIT) return <span className="gc-done">✓ {p.best[g.id] ?? ''}</span>
+    if (n === 1) return <span className="gc-play">1 left ▸</span>
+    return <span className="gc-play">Play ▸</span>
+  }
 
   return (
     <div className="home fade-in">
-      <DailyHero game={featured} onPlay={onPlay} done={done.has(featured.id)} />
-
-      <button className="ranks-btn" onClick={onRanks}>
-        🏆 Today's Leaderboards <span className="rb-go">›</span>
-      </button>
+      <DailyHero game={featured} onPlay={onPlay} done={plays[featured.id] >= DAILY_LIMIT} />
 
       <div className="section-head">
         <h2>Free Games</h2>
@@ -131,11 +124,7 @@ function Home({ onPlay, onRanks }) {
             <div className="gc-blurb">{g.blurb}</div>
             <div className="gc-foot">
               <span className="gc-tag">{g.tag}</span>
-              {done.has(g.id) ? (
-                <span className="gc-done">✓ {p.best[g.id] ?? ''}</span>
-              ) : (
-                <span className="gc-play">Play ▸</span>
-              )}
+              {foot(g)}
             </div>
           </button>
         ))}
@@ -167,13 +156,26 @@ function DailyHero({ game, onPlay, done }) {
 function Session({ game, locked, onExit, onRanks }) {
   const [result, setResult] = useState(null)
   const [started, setStarted] = useState(false)
+  const [needName, setNeedName] = useState(false)
   const rng = useMemo(() => dailyRng(game.id), [game.id])
 
   function handleFinish({ score, summary }) {
     const xpGain = Math.round(score) // XP = points earned; stays 1–2 digit
     finishSession(game.id, score, xpGain)
     recordScore(game.id, score, summary)
+    logPlay({ userId: getUserId(), name: myName(), gameId: game.id, score })
     setResult({ score, summary, xpGain, rank: myRankToday(game.id) })
+  }
+
+  // rules first → Start → ask name (only if not set) → play
+  function onStart() {
+    if (hasName()) setStarted(true)
+    else setNeedName(true)
+  }
+  function onNamed(name) {
+    setName(name)
+    setNeedName(false)
+    setStarted(true)
   }
 
   const Game = game.Component
@@ -195,8 +197,10 @@ function Session({ game, locked, onExit, onRanks }) {
       ) : started ? (
         <Game rng={rng} onFinish={handleFinish} />
       ) : (
-        <HowToPlay game={game} onStart={() => setStarted(true)} />
+        <HowToPlay game={game} onStart={onStart} />
       )}
+
+      {needName && <NameGate onSubmit={onNamed} onClose={() => setNeedName(false)} />}
     </div>
   )
 }
@@ -232,7 +236,7 @@ function LockedView({ game, onRanks, onExit }) {
       <div className="result-emoji">✅</div>
       <h2 className="locked-title">Done for today</h2>
       <p className="muted">
-        You've already played <b>{game.name}</b> today
+        You've used both of today's tries at <b>{game.name}</b>
         {p.best[game.id] != null ? <> · best {p.best[game.id]}</> : null}.
       </p>
       <p className="locked-sub">A fresh challenge unlocks tomorrow. Try another game meanwhile!</p>
@@ -266,7 +270,10 @@ function ResultView({ game, result, onRanks, onExit }) {
         ))}
       </div>
 
-      <button className="primary-btn big" onClick={onRanks}>🏆 Full leaderboard</button>
+      <button className="primary-btn big" onClick={() => shareResult(game, result)}>
+        📤 Share my score
+      </button>
+      <button className="secondary-btn big" onClick={onRanks}>🏆 Full leaderboard</button>
       <button className="text-btn" onClick={onExit}>← Back to games</button>
     </div>
   )

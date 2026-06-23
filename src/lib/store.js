@@ -37,6 +37,21 @@ function dailyRivals(gameId, day) {
 
 const PROFILE_KEY = 'bg.profile'
 const SCORES_KEY = 'bg.scores'
+const UID_KEY = 'bg.uid'
+
+export const DAILY_LIMIT = 2 // attempts per game per day
+
+// stable pseudo-anonymous id for this device (used for Supabase logging)
+export function getUserId() {
+  let id = localStorage.getItem(UID_KEY)
+  if (!id) {
+    id =
+      (crypto.randomUUID && crypto.randomUUID()) ||
+      'u_' + Math.random().toString(36).slice(2) + Date.now().toString(36)
+    localStorage.setItem(UID_KEY, id)
+  }
+  return id
+}
 
 function read(key, fallback) {
   try {
@@ -165,6 +180,17 @@ export function playedTodayIds() {
     if (r.day === today && r.name === me) s.add(r.gameId)
   }
   return s
+}
+
+// how many times the player has finished a game today (cap is DAILY_LIMIT)
+export function playedTodayCount(gameId) {
+  const me = myName()
+  const today = todayKey()
+  let n = 0
+  for (const r of read(SCORES_KEY, [])) {
+    if (r.day === today && r.name === me && r.gameId === gameId) n++
+  }
+  return n
 }
 
 // the player's rank (1-based) in today's board for a game, or null

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ri, shuffle } from '../lib/rng.js'
 
 // Single digits flash one at a time — add them up, then pick the total.
-const ROUNDS = 5
+const ROUNDS = 10
 
 export default function NumberFlash({ rng, onFinish }) {
   const [round, setRound] = useState(1)
@@ -15,7 +15,7 @@ export default function NumberFlash({ rng, onFinish }) {
   const correctRef = useRef(0)
 
   useEffect(() => {
-    const n = round + 2 // 3 → 7 digits
+    const n = Math.min(round + 2, 7) // grows to 7 digits, then holds
     const digits = Array.from({ length: n }, () => ri(rng, 1, 9))
     const sum = digits.reduce((a, b) => a + b, 0)
     sumRef.current = sum

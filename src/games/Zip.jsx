@@ -1,17 +1,18 @@
 import { useMemo, useRef, useState } from 'react'
 import { shuffle } from '../lib/rng.js'
 
-// Draw one continuous path through every cell, hitting the numbered dots
-// 1 → K in order. Original implementation (own generator + tap input).
-const R = 5
-const C = 5
+// Draw one continuous path through every cell, passing the numbered dots
+// 1 → K in order. Drag to draw, drag back / Undo to backtrack.
+// Original implementation (own generator + ribbon rendering + input).
+const R = 6
+const C = 6
 const TOTAL = R * C
-const K = 5
+const K = 8
 
 function genPath(rng) {
   const idx = (r, c) => r * C + c
   const inb = (r, c) => r >= 0 && r < R && c >= 0 && c < C
-  for (let attempt = 0; attempt < 60; attempt++) {
+  for (let attempt = 0; attempt < 80; attempt++) {
     const sr = Math.floor(rng() * R)
     const sc = Math.floor(rng() * C)
     const visited = new Array(TOTAL).fill(false)
@@ -24,7 +25,7 @@ function genPath(rng) {
         const nr = r + dr
         const nc = c + dc
         if (inb(nr, nc) && !visited[idx(nr, nc)]) {
-          if (steps++ > 40000) return false
+          if (steps++ > 120000) return false
           visited[idx(nr, nc)] = true
           path.push([nr, nc])
           if (dfs(nr, nc)) return true
@@ -36,7 +37,6 @@ function genPath(rng) {
     }
     if (dfs(sr, sc)) return path
   }
-  // snake fallback (always valid)
   const path = []
   for (let r = 0; r < R; r++) {
     const cs = [...Array(C).keys()]
@@ -47,38 +47,43 @@ function genPath(rng) {
 }
 
 export default function Zip({ rng, onFinish }) {
-  const { checkpoints, startIdx } = useMemo(() => {
-    const path = genPath(rng)
+  const { checkpoints, startIdx, solution } = useMemo(() => {
+    const p = genPath(rng)
     const cps = {}
-    const positions = [0, 6, 12, 18, 24]
-    positions.forEach((pos, n) => {
-      const [r, c] = path[pos]
+    const step = (p.length - 1) / (K - 1)
+    for (let n = 0; n < K; n++) {
+      const [r, c] = p[Math.round(n * step)]
       cps[r * C + c] = n + 1
-    })
-    const [sr, sc] = path[0]
-    return { checkpoints: cps, startIdx: sr * C + sc }
+    }
+    const sol = p.map(([r, c]) => r * C + c)
+    return { checkpoints: cps, startIdx: sol[0], solution: sol }
   }, [rng])
 
   const [path, setPath] = useState([startIdx])
-  const [nextCp, setNextCp] = useState(2) // dot 1 is the start
+  const [nextCp, setNextCp] = useState(2)
   const [bad, setBad] = useState(-1)
+  const [hint, setHint] = useState(-1)
   const startRef = useRef(performance.now())
+  const dragging = useRef(false)
+  const gridRef = useRef(null)
 
   const head = path[path.length - 1]
   const inPath = new Set(path)
   const adj = (a, b) => {
-    const ar = Math.floor(a / C), ac = a % C, br = Math.floor(b / C), bc = b % C
+    const ar = (a / C) | 0, ac = a % C, br = (b / C) | 0, bc = b % C
     return Math.abs(ar - br) + Math.abs(ac - bc) === 1
   }
 
-  function tap(cell) {
-    if (cell === head && path.length > 1) {
-      const removed = head
-      setPath(path.slice(0, -1))
-      if (checkpoints[removed] && checkpoints[removed] === nextCp - 1) setNextCp(nextCp - 1)
+  function step(cell) {
+    if (cell == null || Number.isNaN(cell)) return
+    const prev = path[path.length - 2]
+    if (cell === prev) {
+      const removed = path[path.length - 1]
+      if (checkpoints[removed] === nextCp - 1) setNextCp((n) => n - 1)
+      setPath((p) => p.slice(0, -1))
       return
     }
-    if (inPath.has(cell) || !adj(cell, head)) return
+    if (cell === head || inPath.has(cell) || !adj(cell, head)) return
     const cp = checkpoints[cell]
     if (cp && cp !== nextCp) {
       setBad(cell)
@@ -89,19 +94,54 @@ export default function Zip({ rng, onFinish }) {
     const nc = cp === nextCp ? nextCp + 1 : nextCp
     setPath(np)
     setNextCp(nc)
+    setHint(-1)
     if (np.length === TOTAL && nc > K) {
       const sec = (performance.now() - startRef.current) / 1000
       setTimeout(
-        () => onFinish({ score: Math.max(10, Math.min(99, Math.round(120 - sec))), summary: `solved in ${sec.toFixed(0)}s` }),
-        260,
+        () =>
+          onFinish({
+            score: Math.max(10, Math.min(99, Math.round(120 - sec))),
+            summary: `solved in ${sec.toFixed(0)}s`,
+          }),
+        280,
       )
     }
   }
 
-  function reset() {
-    setPath([startIdx])
-    setNextCp(2)
+  function cellFromEvent(e) {
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    const c = el && el.closest('[data-i]')
+    return c ? Number(c.dataset.i) : null
   }
+  function onDown(e) {
+    dragging.current = true
+    gridRef.current?.setPointerCapture?.(e.pointerId)
+    step(cellFromEvent(e))
+  }
+  function onMove(e) {
+    if (dragging.current) step(cellFromEvent(e))
+  }
+  function onUp() {
+    dragging.current = false
+  }
+
+  function undo() {
+    if (path.length <= 1) return
+    const removed = path[path.length - 1]
+    if (checkpoints[removed] === nextCp - 1) setNextCp((n) => n - 1)
+    setPath((p) => p.slice(0, -1))
+  }
+  function showHint() {
+    // if the drawn path follows the known solution, suggest the next cell
+    let prefix = true
+    for (let i = 0; i < path.length; i++) if (path[i] !== solution[i]) prefix = false
+    const cell = prefix && path.length < TOTAL ? solution[path.length] : -1
+    setHint(cell)
+    setTimeout(() => setHint(-1), 900)
+  }
+
+  // ribbon polyline points in a 0..C / 0..R coordinate space
+  const pts = path.map((i) => `${(i % C) + 0.5},${((i / C) | 0) + 0.5}`).join(' ')
 
   return (
     <div className="gf">
@@ -118,27 +158,61 @@ export default function Zip({ rng, onFinish }) {
         </div>
       </div>
 
-      <div className="zip-hint">Fill every cell in one path · hit 1→{K} in order</div>
+      <div className="zip-hint-line">Fill every cell in one path · hit 1→{K} in order</div>
 
-      <div className="zipgrid">
-        {Array.from({ length: TOTAL }, (_, i) => {
-          const filled = inPath.has(i)
-          const cp = checkpoints[i]
-          return (
-            <button
-              key={i}
-              className={`zipcell ${filled ? 'on' : ''} ${i === head ? 'head' : ''} ${bad === i ? 'bad' : ''} ${cp ? 'cp' : ''}`}
-              onClick={() => tap(i)}
-            >
-              {cp ? <span className="zip-num">{cp}</span> : filled ? <span className="zip-dot" /> : ''}
-            </button>
-          )
-        })}
+      <div
+        className="zipgrid"
+        ref={gridRef}
+        style={{ gridTemplateColumns: `repeat(${C}, 1fr)` }}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+      >
+        {Array.from({ length: TOTAL }, (_, i) => (
+          <div
+            key={i}
+            data-i={i}
+            className={`zipcell ${inPath.has(i) ? 'on' : ''} ${i === head ? 'head' : ''} ${bad === i ? 'bad' : ''} ${hint === i ? 'hint' : ''}`}
+          />
+        ))}
+
+        <svg className="zip-ribbon" viewBox={`0 0 ${C} ${R}`} preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="zip-grad" x1="0" y1="1" x2="1" y2="0">
+              <stop offset="0" stopColor="var(--g1, #2ee6a6)" />
+              <stop offset="1" stopColor="var(--g2, #00d4ff)" />
+            </linearGradient>
+          </defs>
+          {path.length > 1 && (
+            <polyline
+              points={pts}
+              fill="none"
+              stroke="url(#zip-grad)"
+              strokeWidth="0.6"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          )}
+        </svg>
+
+        <div className="zip-nums" style={{ gridTemplateColumns: `repeat(${C}, 1fr)` }}>
+          {Array.from({ length: TOTAL }, (_, i) => (
+            <div key={i} className="zip-numcell">
+              {checkpoints[i] && <span className="zip-dot">{checkpoints[i]}</span>}
+            </div>
+          ))}
+        </div>
       </div>
 
-      <button className="secondary-btn big" onClick={reset}>
-        ↺ Reset path
-      </button>
+      <div className="zip-controls">
+        <button className="secondary-btn" onClick={undo} disabled={path.length <= 1}>
+          ↺ Undo
+        </button>
+        <button className="secondary-btn" onClick={showHint}>
+          💡 Hint
+        </button>
+      </div>
     </div>
   )
 }

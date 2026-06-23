@@ -1,89 +1,85 @@
 import { useEffect, useRef, useState } from 'react'
-import { ri } from '../lib/rng.js'
+import { shuffle } from '../lib/rng.js'
 
-// A sequence of tiles flashes; repeat it back. Each round adds one. Working memory.
+// Memory Matrix: several tiles light up AT ONCE for a moment, then hide.
+// Tap exactly those tiles. Each level lights one more. Miss one → run ends.
+const SIZE = 4
+const N = SIZE * SIZE
+
 export default function FlashMemory({ rng, onFinish }) {
-  const N = 9 // 3×3
-  const [seq, setSeq] = useState([])
-  const [lit, setLit] = useState(-1)
-  const [phase, setPhase] = useState('show') // show | input | over
-  const [inputIdx, setInputIdx] = useState(0)
-  const [round, setRound] = useState(1)
+  const [level, setLevel] = useState(1)
+  const [phase, setPhase] = useState('show') // show | pick | over
+  const [lit, setLit] = useState([])
+  const [found, setFound] = useState([])
   const [wrong, setWrong] = useState(-1)
-  const seqRef = useRef([])
+  const litSet = useRef(new Set())
 
-  // build/extend the sequence at the start of each round
   useEffect(() => {
-    const next = [...seqRef.current, ri(rng, 0, N - 1)]
-    seqRef.current = next
-    setSeq(next)
+    const count = Math.min(level + 2, N - 3) // 3,4,5… lit tiles
+    const idxs = shuffle(rng, [...Array(N).keys()]).slice(0, count)
+    litSet.current = new Set(idxs)
+    setLit(idxs)
+    setFound([])
+    setWrong(-1)
     setPhase('show')
-    setInputIdx(0)
-    let i = 0
-    const id = setInterval(() => {
-      setLit(next[i])
-      setTimeout(() => setLit(-1), 320)
-      i++
-      if (i >= next.length) {
-        clearInterval(id)
-        setTimeout(() => setPhase('input'), 360)
-      }
-    }, 560)
-    return () => clearInterval(id)
+    const t = setTimeout(() => setPhase('pick'), 900 + count * 280)
+    return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [round])
+  }, [level])
 
   function tap(i) {
-    if (phase !== 'input') return
-    if (i === seq[inputIdx]) {
-      setLit(i)
-      setTimeout(() => setLit(-1), 140)
-      const ni = inputIdx + 1
-      if (ni === seq.length) {
-        setTimeout(() => setRound((r) => r + 1), 320) // next round, longer
-      } else {
-        setInputIdx(ni)
+    if (phase !== 'pick') return
+    if (litSet.current.has(i)) {
+      if (found.includes(i)) return
+      const nf = [...found, i]
+      setFound(nf)
+      if (nf.length === litSet.current.size) {
+        setPhase('show')
+        setTimeout(() => setLevel((l) => l + 1), 380)
       }
     } else {
       setWrong(i)
       setPhase('over')
-      const reached = round // completed rounds = round-1
       setTimeout(
-        () =>
-          onFinish({
-            score: round - 1,
-            summary: `reached level ${round} · ${seq.length} tiles`,
-          }),
-        700,
+        () => onFinish({ score: level - 1, summary: `reached level ${level}` }),
+        850,
       )
     }
   }
+
+  const showing = phase === 'show'
 
   return (
     <div className="gf">
       <div className="gf-hud">
         <div className="hud-chip">
           <span className="hud-k">LEVEL</span>
-          <b className="grad">{round}</b>
+          <b className="grad">{level}</b>
         </div>
         <div className="hud-chip right">
-          <b>{seq.length}</b>
-          <span className="hud-k">tiles</span>
+          <b>
+            {found.length}/{litSet.current.size || lit.length}
+          </b>
+          <span className="hud-k">{showing ? 'memorise' : 'tap the tiles'}</span>
         </div>
       </div>
 
-      <div className="flash-status">
-        {phase === 'show' ? 'watch…' : phase === 'input' ? 'repeat it' : 'missed!'}
+      <div className="mm-status">
+        {showing ? '👀 remember the lit tiles' : phase === 'over' ? 'missed!' : 'now tap them'}
       </div>
 
-      <div className="memgrid">
-        {Array.from({ length: N }, (_, i) => (
-          <button
-            key={i}
-            className={`memcell ${lit === i ? 'lit' : ''} ${wrong === i ? 'wrong' : ''}`}
-            onClick={() => tap(i)}
-          />
-        ))}
+      <div className="memgrid mm">
+        {Array.from({ length: N }, (_, i) => {
+          const isLit = showing && lit.includes(i)
+          const isFound = found.includes(i)
+          return (
+            <button
+              key={i}
+              className={`memcell ${isLit ? 'lit' : ''} ${isFound ? 'found' : ''} ${wrong === i ? 'wrong' : ''}`}
+              onClick={() => tap(i)}
+            />
+          )
+        })}
       </div>
     </div>
   )
