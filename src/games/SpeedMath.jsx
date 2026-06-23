@@ -42,7 +42,7 @@ export default function SpeedMath({ rng, onFinish }) {
     if (v === q.ans) {
       comboRef.current += 1
       correctRef.current += 1
-      setScore((s) => s + 20 + Math.min(comboRef.current, 8) * 5)
+      setScore((s) => s + 1)
       setFb({ t: 'good', v })
     } else {
       comboRef.current = 0

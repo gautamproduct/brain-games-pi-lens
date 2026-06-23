@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import Logo from './Logo.jsx'
 import { GAMES, gameById, featuredGame } from './games/index.js'
 import { dailyRng, makeRng, todayKey } from './lib/rng.js'
 import {
@@ -75,11 +76,11 @@ function Header({ onProfile }) {
   return (
     <header className="topbar">
       <div className="brand">
-        <span className="logo">π</span>
+        <Logo />
         <div>
           <div className="brand-name">Brain Games</div>
           <a className="brand-sub link" href={PI_LENS_URL} target="_blank" rel="noopener noreferrer">
-            by Pi Lens ↗
+            By: Pi Lens App ↗
           </a>
         </div>
       </div>
@@ -97,7 +98,6 @@ function BottomNav({ tab, setTab }) {
   const items = [
     ['home', '🎮', 'Play'],
     ['ranks', '🏆', 'Ranks'],
-    ['profile', '👤', 'You'],
   ]
   return (
     <nav className="bottomnav">
@@ -182,6 +182,7 @@ function DailyHero({ game, onPlay, done }) {
 /* ---------------------------- session ----------------------------- */
 function Session({ game, practice, onExit, onReplay }) {
   const [result, setResult] = useState(null)
+  const [started, setStarted] = useState(practice) // replays skip the how-to
   // daily seed by default; practice uses a fresh random seed each mount
   const rng = useMemo(
     () => (practice ? makeRng(`${game.id}:practice:${Math.random()}`) : dailyRng(game.id)),
@@ -189,8 +190,7 @@ function Session({ game, practice, onExit, onReplay }) {
   )
 
   function handleFinish({ score, summary }) {
-    // bounded so leveling stays sane and comparable across games
-    const xpGain = Math.min(250, Math.round(score / 12) + 15)
+    const xpGain = Math.round(score) // XP = points earned; stays 1–2 digit
     finishSession(game.id, score, xpGain)
     recordScore(game.id, score, summary)
     setResult({ score, summary, xpGain, rank: myRankToday(game.id) })
@@ -221,9 +221,39 @@ function Session({ game, practice, onExit, onReplay }) {
           }}
           onExit={onExit}
         />
-      ) : (
+      ) : started ? (
         <Game rng={rng} onFinish={handleFinish} />
+      ) : (
+        <HowToPlay game={game} onStart={() => setStarted(true)} />
       )}
+    </div>
+  )
+}
+
+function HowToPlay({ game, onStart }) {
+  return (
+    <div className="howto fade-in">
+      <div className="howto-emoji" style={{ background: `linear-gradient(135deg, ${game.g1}, ${game.g2})` }}>
+        {game.emoji}
+      </div>
+      <h2 className="howto-name">{game.name}</h2>
+      <div className="howto-tag">{game.tag}</div>
+
+      <div className="howto-card">
+        <div className="howto-head">How to play</div>
+        <ol className="howto-steps">
+          {game.how.map((step, i) => (
+            <li key={i}>
+              <span className="hs-num">{i + 1}</span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <button className="primary-btn big" onClick={onStart}>
+        Start ▸
+      </button>
     </div>
   )
 }
@@ -389,12 +419,12 @@ function NameGate({ onSubmit, onClose }) {
     <div className="modal-back" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-emoji">👋</div>
-        <h3>What should we call you?</h3>
+        <h3>What's your name?</h3>
         <p className="muted">Shows up on the leaderboard. No sign-up, ever.</p>
         <input
           className="name-input big"
           autoFocus
-          placeholder="Your name or roll no."
+          placeholder="Your name"
           value={name}
           maxLength={16}
           onChange={(e) => setName(e.target.value)}

@@ -33,8 +33,8 @@ export default function SchulteGrid({ rng, onFinish }) {
         clearInterval(intRef.current)
         const netSec = (performance.now() - startRef.current) / 1000 + missRef.current
         onFinish({
-          // cap protects the board from sub-human (bot/cheat) completion times
-          score: Math.max(100, Math.min(8000, Math.round(60000 / netSec))),
+          // small 1–2 digit score; faster = higher, capped so bots can't break it
+          score: Math.max(1, Math.min(99, Math.round(600 / netSec))),
           summary: `${netSec.toFixed(1)}s · ${missRef.current} miss`,
         })
         return

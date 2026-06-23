@@ -11,7 +11,7 @@ export default function OddOneOut({ rng, onFinish }) {
   const rngRef = useRef(rng)
 
   const left = useCountdown(45000, true, () =>
-    onFinish({ score: (roundRef.current - 1) * 100, summary: `${roundRef.current - 1} rounds` }),
+    onFinish({ score: roundRef.current - 1, summary: `${roundRef.current - 1} rounds` }),
   )
 
   // grid size and colour for this round

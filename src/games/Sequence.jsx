@@ -48,7 +48,7 @@ export default function Sequence({ rng, onFinish }) {
   function answer(v) {
     if (v === q.ans) {
       correctRef.current += 1
-      setScore((s) => s + 50)
+      setScore((s) => s + 1)
       setFb({ t: 'good', v })
     } else {
       setFb({ t: 'bad', v })

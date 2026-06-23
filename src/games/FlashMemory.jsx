@@ -51,7 +51,7 @@ export default function FlashMemory({ rng, onFinish }) {
       setTimeout(
         () =>
           onFinish({
-            score: (round - 1) * 120,
+            score: round - 1,
             summary: `reached level ${round} · ${seq.length} tiles`,
           }),
         700,

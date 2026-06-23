@@ -40,7 +40,7 @@ export default function TrueFalse({ rng, onFinish }) {
       const nc = combo + 1
       setCombo(nc)
       correctRef.current += 1
-      setScore((s) => s + 12 + Math.min(nc, 10) * 2)
+      setScore((s) => s + 1)
       setFb('good')
     } else {
       setCombo(0)

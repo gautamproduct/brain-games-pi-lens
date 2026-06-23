@@ -44,7 +44,7 @@ export default function StroopRush({ rng, onFinish }) {
       setCombo(nc)
       maxComboRef.current = Math.max(maxComboRef.current, nc)
       correctRef.current += 1
-      setScore((s) => s + 10 + Math.min(nc, 10) * 2)
+      setScore((s) => s + 1)
       setFb('good')
     } else {
       setCombo(0)

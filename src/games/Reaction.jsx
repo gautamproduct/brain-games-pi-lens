@@ -31,7 +31,7 @@ export default function Reaction({ rng, onFinish }) {
   function finishAll() {
     const arr = timesRef.current
     const avg = Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
-    onFinish({ score: Math.max(100, Math.round(120000 / avg)), summary: `avg ${avg}ms` })
+    onFinish({ score: Math.max(1, Math.min(99, Math.round(9000 / avg))), summary: `avg ${avg}ms` })
   }
 
   function hit() {
