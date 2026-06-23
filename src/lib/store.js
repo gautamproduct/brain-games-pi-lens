@@ -1,7 +1,39 @@
 // All persistence (localStorage). No accounts, no login.
 // Holds the player profile (name, XP, level, streak) and per-game leaderboards.
 
-import { todayKey } from './rng.js'
+import { todayKey, makeRng, hashStr } from './rng.js'
+import { RIVAL_RANGE } from '../games/index.js'
+
+// Synthetic opponents so the board is always populated and the numbers shift
+// every day (seeded by date+game → deterministic, covers any day ahead).
+const RIVAL_NAMES = [
+  'Aarav', 'Vivaan', 'Aditya', 'Arjun', 'Sai', 'Reyansh', 'Ishaan', 'Rohan',
+  'Ananya', 'Diya', 'Saanvi', 'Aadhya', 'Riya', 'Neha', 'Priya', 'Karan',
+  'Rahul', 'Sneha', 'Meera', 'Kabir', 'Dev', 'Tara', 'Aryan', 'Nikhil',
+  'Pooja', 'Simran', 'Manish', 'Tanya', 'Yash', 'Isha',
+]
+
+function dailyRivals(gameId, day) {
+  const range = RIVAL_RANGE[gameId] || [1, 9]
+  const rng = makeRng(`rivals:${gameId}:${day}`)
+  const n = 5 + Math.floor(rng() * 4) // 5–8 rivals
+  const used = new Set()
+  const out = []
+  for (let k = 0; k < n; k++) {
+    let name = RIVAL_NAMES[Math.floor(rng() * RIVAL_NAMES.length)]
+    if (used.has(name)) name = `${name} ${2 + Math.floor(rng() * 7)}`
+    used.add(name)
+    const [lo, hi] = range
+    out.push({
+      name,
+      score: lo + Math.floor(rng() * (hi - lo + 1)),
+      day,
+      ts: hashStr(name + day + gameId),
+      rival: true,
+    })
+  }
+  return out
+}
 
 const PROFILE_KEY = 'bg.profile'
 const SCORES_KEY = 'bg.scores'
@@ -85,6 +117,11 @@ export function getBoard(gameId, scope = 'today') {
     const prev = best.get(r.name)
     if (!prev || r.score > prev.score) best.set(r.name, r)
   }
+  // blend in today's rivals so the board is lively and shifts each day
+  for (const rv of dailyRivals(gameId, todayKey())) {
+    const prev = best.get(rv.name)
+    if (!prev || rv.score > prev.score) best.set(rv.name, rv)
+  }
   return [...best.values()].sort((a, b) => b.score - a.score).slice(0, 20)
 }
 
@@ -102,6 +139,12 @@ export function getOverallBoard() {
   for (const [k, score] of bestByNameGame) {
     const name = k.split('|')[0]
     profiles.set(name, (profiles.get(name) || 0) + score)
+  }
+  // add rivals' totals across all games for today
+  for (const gid of Object.keys(RIVAL_RANGE)) {
+    for (const rv of dailyRivals(gid, todayKey())) {
+      profiles.set(rv.name, (profiles.get(rv.name) || 0) + rv.score)
+    }
   }
   return [...profiles.entries()]
     .map(([name, total]) => ({ name, score: total }))

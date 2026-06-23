@@ -35,7 +35,7 @@ body {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 14px 14px 84px;
+  padding: 14px 14px 24px;
   gap: 14px;
 }
 
@@ -359,6 +359,68 @@ body {
 .muted { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
 .muted.small { font-size: 11.5px; margin-top: 16px; text-align: center; }
 .empty { text-align: center; color: var(--muted); padding: 30px 0; }
+
+/* ---------- home ranks button ---------- */
+.ranks-btn {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--card-2); border: 1px solid var(--line); border-radius: 14px;
+  color: var(--text); font-weight: 800; font-size: 14px; padding: 13px; cursor: pointer;
+}
+.ranks-btn .rb-go { color: var(--muted); font-size: 18px; }
+.ranks-btn:active { transform: scale(0.99); border-color: var(--brand); }
+
+/* ---------- opt button feedback ---------- */
+.opt-btn.good { border-color: var(--ok); background: rgba(46, 230, 166, 0.14); }
+.opt-btn.bad { border-color: var(--bad); background: rgba(255, 93, 108, 0.14); }
+
+/* ---------- Number Flash ---------- */
+.nf-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.nf-flash {
+  font-size: 120px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums;
+  background: linear-gradient(135deg, var(--g1, var(--brand-2)), var(--g2, var(--brand)));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: pop 0.18s ease; min-height: 130px; display: grid; place-items: center;
+}
+.nf-sub { color: var(--muted); font-size: 13px; font-weight: 700; }
+.nf-ask { text-align: center; font-size: 22px; font-weight: 800; margin: 20px 0 24px; }
+
+/* ---------- Cross Math ---------- */
+.cm-wrap { display: grid; place-items: center; margin: 14px 0 20px; }
+.cmgrid {
+  display: grid; grid-template-columns: repeat(5, auto); gap: 6px 8px; align-items: center; justify-items: center;
+}
+.cm-cell {
+  width: 52px; height: 52px; display: grid; place-items: center; border-radius: 12px;
+  font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.cm-cell.num { background: var(--card-2); border: 1px solid var(--line); }
+.cm-cell.res { background: rgba(124, 92, 255, 0.14); border: 1px solid rgba(124, 92, 255, 0.4); color: #cfd6ff; }
+.cm-op { font-size: 20px; font-weight: 800; color: var(--muted); width: 20px; text-align: center; }
+.cm-q { color: var(--brand-2); font-size: 26px; }
+.cm-fill.ok { color: var(--ok); }
+.cm-fill.no { color: var(--bad); }
+.cm-ask { text-align: center; font-size: 14px; font-weight: 700; color: var(--muted); margin-bottom: 14px; }
+
+/* ---------- Zip ---------- */
+.zip-hint { text-align: center; font-size: 12.5px; font-weight: 700; color: var(--muted); margin: 8px 0 16px; }
+.zipgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; max-width: 360px; margin: 0 auto 18px; width: 100%; }
+.zipcell {
+  aspect-ratio: 1; border-radius: 12px; border: 1px solid var(--line); background: var(--card-2);
+  cursor: pointer; display: grid; place-items: center; transition: background 0.1s, transform 0.05s;
+}
+.zipcell:active { transform: scale(0.95); }
+.zipcell.on { background: linear-gradient(135deg, var(--g1), var(--g2)); border-color: transparent; }
+.zipcell.head { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5) inset; }
+.zipcell.bad { background: var(--bad); }
+.zip-num { font-size: 20px; font-weight: 900; color: #08101e; }
+.zipcell:not(.on) .zip-num { color: var(--text); }
+.zip-dot { width: 12px; height: 12px; border-radius: 50%; background: rgba(8, 16, 30, 0.55); }
+
+/* ---------- locked ---------- */
+.locked-title { font-size: 26px; font-weight: 900; margin: 10px 0 8px; }
+.locked-sub { color: var(--muted); font-size: 13.5px; max-width: 300px; margin: 6px 0 22px; }
+
+.board-head.w100, .section-head.w100 { width: 100%; }
 
 /* ---------- animations ---------- */
 .fade-in { animation: fade 0.3s ease; }

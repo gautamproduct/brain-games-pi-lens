@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import Logo from './Logo.jsx'
-import { GAMES, gameById, featuredGame } from './games/index.js'
-import { dailyRng, makeRng, todayKey } from './lib/rng.js'
+import { GAMES, featuredGame } from './games/index.js'
+import { dailyRng, todayKey } from './lib/rng.js'
 import {
   getProfile,
   hasName,
@@ -20,24 +20,30 @@ const PI_LENS_URL = 'https://play.google.com/store/apps/details?id=live.pw.pilen
 
 export default function App() {
   const [tab, setTab] = useState('home') // home | ranks | profile
-  const [session, setSession] = useState(null) // { game, practice }
-  const [pending, setPending] = useState(null) // game waiting on name gate
+  const [session, setSession] = useState(null) // { game, locked }
+  const [pending, setPending] = useState(null)
   const [, force] = useState(0)
   const refresh = () => force((n) => n + 1)
 
-  function launch(game, practice = false) {
+  function launch(game) {
     if (!hasName()) {
-      setPending({ game, practice })
+      setPending(game)
       return
     }
-    setSession({ game, practice })
+    const locked = playedTodayIds().has(game.id)
+    setSession({ game, locked })
   }
 
   function onNamed(name) {
     setName(name)
-    const p = pending
+    const g = pending
     setPending(null)
-    if (p) setSession({ game: p.game, practice: p.practice })
+    if (g) setSession({ game: g, locked: playedTodayIds().has(g.id) })
+    refresh()
+  }
+
+  function closeSession() {
+    setSession(null)
     refresh()
   }
 
@@ -46,30 +52,29 @@ export default function App() {
       <Header onProfile={() => setTab('profile')} />
 
       <main className="stage">
-        {tab === 'home' && <Home onPlay={launch} />}
-        {tab === 'ranks' && <Ranks />}
-        {tab === 'profile' && <Profile onChanged={refresh} />}
+        {tab === 'home' && <Home onPlay={launch} onRanks={() => setTab('ranks')} />}
+        {tab === 'ranks' && <Ranks onBack={() => setTab('home')} />}
+        {tab === 'profile' && <Profile onBack={() => setTab('home')} onChanged={refresh} />}
       </main>
-
-      <BottomNav tab={tab} setTab={setTab} />
 
       {pending && <NameGate onSubmit={onNamed} onClose={() => setPending(null)} />}
       {session && (
         <Session
           game={session.game}
-          practice={session.practice}
-          onExit={() => {
+          locked={session.locked}
+          onExit={closeSession}
+          onRanks={() => {
             setSession(null)
+            setTab('ranks')
             refresh()
           }}
-          onReplay={(g) => setSession({ game: g, practice: true })}
         />
       )}
     </div>
   )
 }
 
-/* ----------------------------- chrome ----------------------------- */
+/* ----------------------------- header ----------------------------- */
 function Header({ onProfile }) {
   const p = getProfile()
   const { lvl, pct } = levelProgress(p.xp)
@@ -94,36 +99,19 @@ function Header({ onProfile }) {
   )
 }
 
-function BottomNav({ tab, setTab }) {
-  const items = [
-    ['home', '🎮', 'Play'],
-    ['ranks', '🏆', 'Ranks'],
-  ]
-  return (
-    <nav className="bottomnav">
-      {items.map(([id, icon, label]) => (
-        <button
-          key={id}
-          className={`navitem ${tab === id ? 'active' : ''}`}
-          onClick={() => setTab(id)}
-        >
-          <span className="navicon">{icon}</span>
-          {label}
-        </button>
-      ))}
-    </nav>
-  )
-}
-
 /* ------------------------------ home ------------------------------ */
-function Home({ onPlay }) {
-  const done = useMemo(() => playedTodayIds(), [])
+function Home({ onPlay, onRanks }) {
+  const done = playedTodayIds() // recompute each render so ✓ ticks update
   const featured = featuredGame(todayKey())
   const p = getProfile()
 
   return (
     <div className="home fade-in">
       <DailyHero game={featured} onPlay={onPlay} done={done.has(featured.id)} />
+
+      <button className="ranks-btn" onClick={onRanks}>
+        🏆 Today's Leaderboards <span className="rb-go">›</span>
+      </button>
 
       <div className="section-head">
         <h2>Free Games</h2>
@@ -158,11 +146,7 @@ function Home({ onPlay }) {
 
 function DailyHero({ game, onPlay, done }) {
   return (
-    <button
-      className="daily-hero"
-      style={{ '--g1': game.g1, '--g2': game.g2 }}
-      onClick={() => onPlay(game)}
-    >
+    <button className="daily-hero" style={{ '--g1': game.g1, '--g2': game.g2 }} onClick={() => onPlay(game)}>
       <div className="dh-top">
         <span className="dh-label">★ DAILY CHALLENGE</span>
         <span className="dh-date">{new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
@@ -174,20 +158,16 @@ function DailyHero({ game, onPlay, done }) {
           <div className="dh-sub">New puzzle today · {game.blurb}</div>
         </div>
       </div>
-      <div className="dh-cta">{done ? 'Play again ▸' : 'Start ▸'}</div>
+      <div className="dh-cta">{done ? 'Done ✓ · see ranks' : 'Start ▸'}</div>
     </button>
   )
 }
 
 /* ---------------------------- session ----------------------------- */
-function Session({ game, practice, onExit, onReplay }) {
+function Session({ game, locked, onExit, onRanks }) {
   const [result, setResult] = useState(null)
-  const [started, setStarted] = useState(practice) // replays skip the how-to
-  // daily seed by default; practice uses a fresh random seed each mount
-  const rng = useMemo(
-    () => (practice ? makeRng(`${game.id}:practice:${Math.random()}`) : dailyRng(game.id)),
-    [game.id, practice],
-  )
+  const [started, setStarted] = useState(false)
+  const rng = useMemo(() => dailyRng(game.id), [game.id])
 
   function handleFinish({ score, summary }) {
     const xpGain = Math.round(score) // XP = points earned; stays 1–2 digit
@@ -201,26 +181,17 @@ function Session({ game, practice, onExit, onReplay }) {
   return (
     <div className="session" style={{ '--g1': game.g1, '--g2': game.g2 }}>
       <div className="session-top">
-        <button className="icon-btn" onClick={onExit}>
-          ✕
-        </button>
+        <button className="icon-btn" onClick={onExit}>✕</button>
         <div className="session-title">
           <span>{game.emoji}</span> {game.name}
-          {practice && <span className="prac-tag">practice</span>}
         </div>
         <span className="session-spacer" />
       </div>
 
-      {result ? (
-        <ResultView
-          game={game}
-          result={result}
-          onReplay={() => {
-            setResult(null)
-            onReplay(game)
-          }}
-          onExit={onExit}
-        />
+      {locked ? (
+        <LockedView game={game} onRanks={onRanks} onExit={onExit} />
+      ) : result ? (
+        <ResultView game={game} result={result} onRanks={onRanks} onExit={onExit} />
       ) : started ? (
         <Game rng={rng} onFinish={handleFinish} />
       ) : (
@@ -238,7 +209,6 @@ function HowToPlay({ game, onStart }) {
       </div>
       <h2 className="howto-name">{game.name}</h2>
       <div className="howto-tag">{game.tag}</div>
-
       <div className="howto-card">
         <div className="howto-head">How to play</div>
         <ol className="howto-steps">
@@ -250,15 +220,29 @@ function HowToPlay({ game, onStart }) {
           ))}
         </ol>
       </div>
-
-      <button className="primary-btn big" onClick={onStart}>
-        Start ▸
-      </button>
+      <button className="primary-btn big" onClick={onStart}>Start ▸</button>
     </div>
   )
 }
 
-function ResultView({ game, result, onReplay, onExit }) {
+function LockedView({ game, onRanks, onExit }) {
+  const p = getProfile()
+  return (
+    <div className="result fade-in">
+      <div className="result-emoji">✅</div>
+      <h2 className="locked-title">Done for today</h2>
+      <p className="muted">
+        You've already played <b>{game.name}</b> today
+        {p.best[game.id] != null ? <> · best {p.best[game.id]}</> : null}.
+      </p>
+      <p className="locked-sub">A fresh challenge unlocks tomorrow. Try another game meanwhile!</p>
+      <button className="primary-btn big" onClick={onRanks}>🏆 View ranks</button>
+      <button className="text-btn" onClick={onExit}>← Back to games</button>
+    </div>
+  )
+}
+
+function ResultView({ game, result, onRanks, onExit }) {
   const board = useMemo(() => getBoard(game.id, 'today'), [game.id])
   const me = myName()
   return (
@@ -282,38 +266,30 @@ function ResultView({ game, result, onReplay, onExit }) {
         ))}
       </div>
 
-      <button className="primary-btn big" onClick={onReplay}>
-        ↻ Play again
-      </button>
-      <button className="text-btn" onClick={onExit}>
-        Back to games
-      </button>
+      <button className="primary-btn big" onClick={onRanks}>🏆 Full leaderboard</button>
+      <button className="text-btn" onClick={onExit}>← Back to games</button>
     </div>
   )
 }
 
 /* ----------------------------- ranks ------------------------------ */
-function Ranks() {
+function Ranks({ onBack }) {
   const [sel, setSel] = useState('overall')
   const [scope, setScope] = useState('today')
   const me = myName()
-  const rows =
-    sel === 'overall' ? getOverallBoard() : getBoard(sel, scope)
+  const rows = sel === 'overall' ? getOverallBoard() : getBoard(sel, scope)
 
   return (
     <div className="ranks fade-in">
-      <h2 className="ranks-title">🏆 Leaderboards</h2>
+      <div className="board-head">
+        <h2>🏆 Leaderboards</h2>
+        <button className="ghost-btn" onClick={onBack}>← Back</button>
+      </div>
 
       <div className="chip-scroll">
-        <button className={`fchip ${sel === 'overall' ? 'on' : ''}`} onClick={() => setSel('overall')}>
-          ⭐ Overall
-        </button>
+        <button className={`fchip ${sel === 'overall' ? 'on' : ''}`} onClick={() => setSel('overall')}>⭐ Overall</button>
         {GAMES.map((g) => (
-          <button
-            key={g.id}
-            className={`fchip ${sel === g.id ? 'on' : ''}`}
-            onClick={() => setSel(g.id)}
-          >
+          <button key={g.id} className={`fchip ${sel === g.id ? 'on' : ''}`} onClick={() => setSel(g.id)}>
             {g.emoji} {g.name}
           </button>
         ))}
@@ -321,12 +297,8 @@ function Ranks() {
 
       {sel !== 'overall' && (
         <div className="tabs">
-          <button className={`tab ${scope === 'today' ? 'active' : ''}`} onClick={() => setScope('today')}>
-            Today
-          </button>
-          <button className={`tab ${scope === 'all' ? 'active' : ''}`} onClick={() => setScope('all')}>
-            All time
-          </button>
+          <button className={`tab ${scope === 'today' ? 'active' : ''}`} onClick={() => setScope('today')}>Today</button>
+          <button className={`tab ${scope === 'all' ? 'active' : ''}`} onClick={() => setScope('all')}>All time</button>
         </div>
       )}
 
@@ -335,7 +307,7 @@ function Ranks() {
       ) : (
         <ol className="board-list">
           {rows.map((r, i) => (
-            <li key={(r.ts || r.name) + i} className={`board-row rank-${i + 1} ${r.name === me ? 'me' : ''}`}>
+            <li key={(r.ts || r.name) + '' + i} className={`board-row rank-${i + 1} ${r.name === me ? 'me' : ''}`}>
               <span className="rank">{['🥇', '🥈', '🥉'][i] || i + 1}</span>
               <span className="lb-name">
                 {r.name}
@@ -346,15 +318,13 @@ function Ranks() {
           ))}
         </ol>
       )}
-      <p className="muted small">
-        Scores saved on this device. Hook up a backend for a shared board.
-      </p>
+      <p className="muted small">Ranks update daily · saved on this device.</p>
     </div>
   )
 }
 
 /* ---------------------------- profile ----------------------------- */
-function Profile({ onChanged }) {
+function Profile({ onBack, onChanged }) {
   const p = getProfile()
   const { lvl, cur, span, pct } = levelProgress(p.xp)
   const [editing, setEditing] = useState(false)
@@ -372,6 +342,11 @@ function Profile({ onChanged }) {
 
   return (
     <div className="profile fade-in">
+      <div className="board-head w100">
+        <h2>You</h2>
+        <button className="ghost-btn" onClick={onBack}>← Back</button>
+      </div>
+
       <div className="avatar">{(p.name || 'P').slice(0, 1).toUpperCase()}</div>
       {editing ? (
         <div className="name-row">
@@ -379,9 +354,7 @@ function Profile({ onChanged }) {
           <button className="primary-btn" onClick={save}>Save</button>
         </div>
       ) : (
-        <div className="pname" onClick={() => setEditing(true)}>
-          {p.name || 'Player'} <span className="edit">✎</span>
-        </div>
+        <div className="pname" onClick={() => setEditing(true)}>{p.name || 'Player'} <span className="edit">✎</span></div>
       )}
 
       <div className="lvl-line">Level {lvl}</div>
@@ -394,7 +367,7 @@ function Profile({ onChanged }) {
         <div className="stat"><div className="stat-num">{p.xp}</div><div className="stat-label">total XP</div></div>
       </div>
 
-      <div className="section-head"><h2>Your best scores</h2></div>
+      <div className="section-head w100"><h2>Your best scores</h2></div>
       {playedBest.length === 0 ? (
         <p className="empty">Play a game to set your first score.</p>
       ) : (

@@ -1,11 +1,11 @@
 import SchulteGrid from './SchulteGrid.jsx'
 import StroopRush from './StroopRush.jsx'
 import FlashMemory from './FlashMemory.jsx'
-import OddOneOut from './OddOneOut.jsx'
+import NumberFlash from './NumberFlash.jsx'
 import SpeedMath from './SpeedMath.jsx'
 import TrueFalse from './TrueFalse.jsx'
-import Sequence from './Sequence.jsx'
-import Reaction from './Reaction.jsx'
+import CrossMath from './CrossMath.jsx'
+import Zip from './Zip.jsx'
 
 export const GAMES = [
   {
@@ -36,7 +36,7 @@ export const GAMES = [
       'A colour word appears — but in a different ink colour.',
       'Tap the colour of the INK, not what the word says.',
       'e.g. “GREEN” written in blue → tap Blue.',
-      'Score = correct answers in 30 seconds.',
+      '10 questions. Score = how many you get right.',
     ],
     Component: StroopRush,
   },
@@ -57,34 +57,34 @@ export const GAMES = [
     Component: FlashMemory,
   },
   {
-    id: 'odd',
-    name: 'Odd One Out',
-    emoji: '👁️',
-    tag: 'Attention',
-    blurb: 'Spot the different tile',
-    g1: '#b47bff',
-    g2: '#ff5d6c',
+    id: 'numflash',
+    name: 'Number Flash',
+    emoji: '➕',
+    tag: 'Mental Math',
+    blurb: 'Add the flashing digits',
+    g1: '#ffd24a',
+    g2: '#2ee6a6',
     how: [
-      'Every tile is the same colour — except one.',
-      'Tap the tile that looks slightly different.',
-      'Each round the difference shrinks and the grid grows.',
-      'A wrong tap costs −2s. Clear as many as you can in 45s.',
+      'Single digits flash on screen one at a time.',
+      'Add them up in your head as they go.',
+      'At the end, tap the correct total.',
+      '5 rounds — each one shows more digits.',
     ],
-    Component: OddOneOut,
+    Component: NumberFlash,
   },
   {
     id: 'speed',
     name: 'Speed Math',
     emoji: '⚡',
     tag: 'Calc',
-    blurb: 'Solve as many as you can',
+    blurb: 'Solve 10 sums fast',
     g1: '#ffd24a',
     g2: '#ff7a4a',
     how: [
       'A sum appears with four answer choices.',
       'Tap the correct answer as fast as you can.',
       'No typing — just tap.',
-      'Score = correct answers in 45 seconds.',
+      '10 questions. Score = how many you get right.',
     ],
     Component: SpeedMath,
   },
@@ -100,43 +100,55 @@ export const GAMES = [
       'An equation flashes, e.g. 7 × 8 = 54.',
       'Decide quickly: is it True or False?',
       'Tap ✓ True or ✗ False.',
-      'Score = correct answers in 30 seconds.',
+      '10 questions. Score = how many you get right.',
     ],
     Component: TrueFalse,
   },
   {
-    id: 'sequence',
-    name: 'Next in Line',
-    emoji: '🔭',
+    id: 'crossmath',
+    name: 'Cross Math',
+    emoji: '✖️',
     tag: 'Logic',
-    blurb: 'Crack the number pattern',
+    blurb: 'Fill the missing number',
     g1: '#00d4ff',
     g2: '#7c5cff',
     how: [
-      'A number sequence is shown with the last one missing.',
-      'Work out the pattern (add, multiply, squares…).',
-      'Tap the number that comes next.',
-      'Score = correct answers in 60 seconds.',
+      'A cross of equations is shown with one number missing.',
+      'The blank sits in both a row and a column.',
+      'Find the number that makes BOTH work out, and tap it.',
+      '5 puzzles. Score = how many you solve.',
     ],
-    Component: Sequence,
+    Component: CrossMath,
   },
   {
-    id: 'reaction',
-    name: 'Reflex Tap',
-    emoji: '⏱️',
-    tag: 'Reflex',
-    blurb: 'Tap the instant it turns green',
+    id: 'zip',
+    name: 'Zip',
+    emoji: '🧩',
+    tag: 'Path',
+    blurb: 'Complete the path 1→5',
     g1: '#2ee6a6',
-    g2: '#ffd24a',
+    g2: '#00d4ff',
     how: [
-      'Wait for the panel to turn green.',
-      'The moment it does, tap as fast as you can.',
-      "Don't jump early — that resets the trial.",
-      '5 trials. A faster average means a higher score.',
+      'Draw one path that fills every cell exactly once.',
+      'Start at dot 1 and tap neighbouring cells to extend.',
+      'Pass through the dots 1 → 5 in order.',
+      'Tap the end of your path to undo. Cover the whole grid to win.',
     ],
-    Component: Reaction,
+    Component: Zip,
   },
 ]
+
+// score ranges for the synthetic daily rivals (keeps the board lively & fair)
+export const RIVAL_RANGE = {
+  schulte: [22, 66],
+  stroop: [3, 9],
+  flash: [3, 11],
+  numflash: [1, 5],
+  speed: [3, 10],
+  truefalse: [3, 9],
+  crossmath: [1, 5],
+  zip: [28, 82],
+}
 
 export const gameById = (id) => GAMES.find((g) => g.id === id)
 
