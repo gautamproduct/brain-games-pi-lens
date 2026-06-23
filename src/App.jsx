@@ -369,8 +369,13 @@ function Ranks({ onBack, onChanged }) {
         <div className="yc-rank"><b>{rank ? `#${rank}` : '—'}</b><span>today</span></div>
       </div>
 
-      <button className="secondary-btn big share-invite" onClick={shareInvite}>
-        📤 Share &amp; challenge friends
+      <button className="invite-cta" onClick={shareInvite}>
+        <span className="invite-emoji">🏆</span>
+        <span className="invite-text">
+          <b>Challenge your friends</b>
+          <small>Share your rank · see who's sharper</small>
+        </span>
+        <span className="invite-go">→</span>
       </button>
 
       <div className="chip-scroll">
