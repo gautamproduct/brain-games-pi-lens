@@ -548,3 +548,5 @@ body {
 /* tidy leaderboard spacing */
 .your-card { padding: 12px 14px; }
 .ranks .chip-scroll { margin-top: 4px; }
+
+.bigq { letter-spacing: 3px; }
