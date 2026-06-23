@@ -564,3 +564,66 @@ body {
 .ranks .board-row .rank { font-size: 16px; }
 .ranks .board-row .lb-name { font-size: 14.5px; }
 .ranks .muted.small { margin-top: 18px; padding-bottom: 4px; }
+
+/* ============ finishing touches: motion & detailing ============ */
+button { transition: transform .09s ease, box-shadow .22s ease, border-color .22s ease, background .22s ease, opacity .2s ease; }
+
+/* desktop hover lift (no effect on touch) */
+@media (hover: hover) {
+  .game-card:hover { transform: translateY(-3px); border-color: rgba(124,92,255,.55); box-shadow: 0 16px 34px -18px var(--g1); }
+  .primary-btn:hover { transform: translateY(-2px); box-shadow: 0 16px 30px -8px rgba(124,92,255,.55), inset 0 1px 0 rgba(255,255,255,.3); }
+  .secondary-btn:hover, .ghost-btn:hover, .icon-btn:hover { transform: translateY(-2px); border-color: rgba(124,92,255,.5); }
+  .board-row:hover { border-color: rgba(124,92,255,.4); }
+  .fchip:hover { border-color: rgba(124,92,255,.45); }
+  .daily-hero:hover { transform: translateY(-2px); box-shadow: 0 22px 44px -14px var(--g1); }
+}
+
+/* gentle entrance helpers */
+@keyframes riseIn { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes popIn { 0% { opacity: 0; transform: scale(.6); } 60% { transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes softPulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+@keyframes badshake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+
+/* staggered home cards */
+.daily-hero { animation: riseIn .5s cubic-bezier(.2,.7,.3,1) both; }
+.game-grid .game-card { animation: riseIn .46s cubic-bezier(.2,.7,.3,1) both; }
+.game-grid .game-card:nth-child(1){animation-delay:.04s}
+.game-grid .game-card:nth-child(2){animation-delay:.08s}
+.game-grid .game-card:nth-child(3){animation-delay:.12s}
+.game-grid .game-card:nth-child(4){animation-delay:.16s}
+.game-grid .game-card:nth-child(5){animation-delay:.20s}
+.game-grid .game-card:nth-child(6){animation-delay:.24s}
+.game-grid .game-card:nth-child(7){animation-delay:.28s}
+.game-grid .game-card:nth-child(8){animation-delay:.32s}
+
+/* leaderboard rows cascade in */
+.board-list .board-row { animation: riseIn .4s ease both; }
+.board-list .board-row:nth-child(1){animation-delay:.03s}
+.board-list .board-row:nth-child(2){animation-delay:.07s}
+.board-list .board-row:nth-child(3){animation-delay:.11s}
+.board-list .board-row:nth-child(4){animation-delay:.15s}
+.board-list .board-row:nth-child(5){animation-delay:.19s}
+.board-list .board-row:nth-child(6){animation-delay:.23s}
+.board-list .board-row:nth-child(7){animation-delay:.27s}
+.board-list .board-row:nth-child(8){animation-delay:.31s}
+.board-list .board-row.rank-1 { box-shadow: 0 0 0 1px rgba(255,210,74,.4), 0 10px 26px -14px rgba(255,210,74,.5); }
+
+/* result screen choreography */
+.result-emoji { animation: popIn .55s cubic-bezier(.2,1.4,.4,1) both; }
+.result-cheer { font-size: 15px; font-weight: 800; color: var(--brand-2); letter-spacing: .3px; margin-top: 6px; animation: riseIn .4s ease both; animation-delay: .15s; }
+.result-score { animation: popIn .6s cubic-bezier(.2,1.4,.4,1) both; animation-delay: .1s; }
+.result-chips .rchip { animation: riseIn .42s ease both; animation-delay: .3s; }
+.mini-board { animation: riseIn .42s ease both; animation-delay: .36s; }
+
+/* answer feedback */
+.opt-btn.good { animation: goodpulse .32s ease; }
+.opt-btn.bad { animation: badshake .32s ease; }
+.tf-btn:active { transform: scale(.96); }
+
+/* loading shimmer */
+.board-loading { animation: softPulse 1.3s ease-in-out infinite; }
+
+/* respect reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

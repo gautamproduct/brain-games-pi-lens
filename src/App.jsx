@@ -274,10 +274,13 @@ function ResultView({ game, result, onRanks, onExit }) {
   }, [game.id])
 
   const rank = board ? (board.findIndex((r) => r.me) + 1 || null) : null
+  const CHEERS = ['Nice work!', 'Sharp! 🧠', 'Well played!', 'Crushed it!', 'Brain power! ⚡', 'On a roll!']
+  const cheer = CHEERS[result.score % CHEERS.length]
 
   return (
     <div className="result fade-in">
       <div className="result-emoji">{game.emoji}</div>
+      <div className="result-cheer">{cheer}</div>
       <div className="result-score">{result.score}</div>
       <div className="result-sum">{result.summary}</div>
       <div className="result-chips">
