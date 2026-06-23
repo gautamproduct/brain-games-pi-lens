@@ -356,7 +356,13 @@ function Ranks({ onBack, onChanged }) {
         <div className="yc-main">
           {editing ? (
             <div className="name-row">
-              <input className="name-input" value={nameInput} maxLength={16} onChange={(e) => setNameInput(e.target.value)} />
+              <input
+                className="name-input"
+                value={nameInput}
+                maxLength={16}
+                onChange={(e) => setNameInput(e.target.value)}
+                onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300)}
+              />
               <button className="primary-btn" onClick={saveName}>Save</button>
             </div>
           ) : (

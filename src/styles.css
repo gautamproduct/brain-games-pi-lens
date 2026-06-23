@@ -668,3 +668,46 @@ button { transition: transform .09s ease, box-shadow .22s ease, border-color .22
 .board-row.rank-1 .rank, .board-row.rank-2 .rank, .board-row.rank-3 .rank { font-size: 20px; }
 .board-row.me { box-shadow: 0 0 0 1px var(--brand) inset, 0 0 24px -6px rgba(124,92,255,.5); }
 .board-row.me .lb-name { color: #fff; }
+
+/* ============ mobile keyboard + safe-area fixes ============ */
+/* name modal sits high so the keyboard never covers the input */
+.modal-back { align-items: flex-start; padding-top: 12vh; }
+.name-input.big { scroll-margin: 30vh; }
+
+/* keep answer buttons clear of the home indicator / browser bar */
+.session { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+.opt-grid, .tf-row { margin-bottom: 10px; }
+.gf { padding-bottom: 6px; }
+
+/* ============ consistent button sizing ============ */
+.primary-btn.big, .secondary-btn.big { min-height: 52px; }
+.invite-cta { min-height: 62px; }
+.opt-btn { min-height: 54px; padding: 14px; font-size: 17px; }
+.opt-btn.num { font-size: 22px; }
+.tf-btn { min-height: 58px; padding: 16px; font-size: 19px; }
+.ghost-btn, .fchip, .tab { min-height: 42px; }
+.text-btn { min-height: 44px; }
+
+/* ============ adapt to screen size ============ */
+/* shorter phones: tighten so everything fits without scrolling */
+@media (max-height: 720px) {
+  .bigq { font-size: 38px; margin: 16px 0; padding: 16px; }
+  .stroop-word { font-size: 42px; }
+  .stroop-word-wrap { margin: 14px 0 18px; padding: 18px; }
+  .schulte { gap: 6px; }
+  .howto-card { padding: 14px; margin: 16px 0; }
+  .howto-steps { gap: 10px; }
+  .howto-emoji { width: 64px; height: 64px; font-size: 34px; }
+  .nf-flash { font-size: clamp(64px, 22vw, 110px); }
+}
+/* small phones */
+@media (max-width: 360px) {
+  .app { padding: 12px 11px 22px; }
+  .game-grid { gap: 10px; }
+  .game-card { padding: 12px; border-radius: 16px; }
+  .gc-blurb { font-size: 11px; min-height: 28px; }
+  .bigq { font-size: 34px; letter-spacing: 2px; }
+  .opt-btn { font-size: 16px; padding: 13px; }
+  .opt-btn.num { font-size: 20px; }
+  .dh-name { font-size: 20px; }
+}
