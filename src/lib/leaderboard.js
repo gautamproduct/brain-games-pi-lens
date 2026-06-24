@@ -5,6 +5,10 @@
 import { supabaseEnabled, sbSelect } from './supabase.js'
 import { getBoard, getOverallBoard, getUserId, myName } from './store.js'
 import { todayKey } from './rng.js'
+import { XP_MAX } from '../games/index.js'
+
+// each game contributes at most 10 to the overall total (fair across games)
+const norm10 = (gameId, score) => Math.min(10, Math.round((score / (XP_MAX[gameId] || 10)) * 10))
 
 const mapLocal = (rows) =>
   rows.map((r) => ({ name: r.name, score: r.score, uid: r.name, me: r.name === myName() }))
@@ -57,12 +61,12 @@ export async function overallBoard(scope = 'today') {
       const uid = r.user_id || r.name
       const k = uid + '|' + r.game_id
       const p = bestNG.get(k)
-      if (!p || r.score > p.score) bestNG.set(k, { name: r.name, uid, score: r.score })
+      if (!p || r.score > p.score) bestNG.set(k, { name: r.name, uid, gameId: r.game_id, score: r.score })
     }
     const tot = new Map()
     for (const v of bestNG.values()) {
       const t = tot.get(v.uid) || { name: v.name, uid: v.uid, score: 0 }
-      t.score += v.score
+      t.score += norm10(v.gameId, v.score) // normalized: each game max 10
       t.name = v.name
       tot.set(v.uid, t)
     }
