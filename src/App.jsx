@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Logo from './Logo.jsx'
 import { GAMES, featuredGame, XP_MAX } from './games/index.js'
 import { dailyRng, todayKey } from './lib/rng.js'
@@ -159,28 +159,34 @@ function Session({ game, locked, onExit, onRanks }) {
   const [result, setResult] = useState(null)
   const [started, setStarted] = useState(false)
   const [needName, setNeedName] = useState(false)
+  const startedAtRef = useRef(0)
   const rng = useMemo(() => dailyRng(game.id), [game.id])
 
   function handleFinish({ score, summary }) {
     // normalize XP to a fair 1–10 scale across all games
     const xpGain = Math.max(1, Math.min(10, Math.round((score / (XP_MAX[game.id] || 10)) * 10)))
+    const ms = Math.max(0, Math.round(performance.now() - startedAtRef.current)) // speed tiebreak
     finishSession(game.id, score, xpGain)
-    recordScore(game.id, score, summary)
-    logPlay({ userId: getUserId(), name: myName(), gameId: game.id, score })
+    recordScore(game.id, score, summary, ms)
+    logPlay({ userId: getUserId(), name: myName(), gameId: game.id, score, ms })
     clearBoardCache() // so the leaderboard reflects this run
     winBuzz()
     setResult({ score, summary, xpGain })
   }
 
   // rules first → Start → ask name (only if not set) → play
+  function begin() {
+    startedAtRef.current = performance.now()
+    setStarted(true)
+  }
   function onStart() {
-    if (hasName()) setStarted(true)
+    if (hasName()) begin()
     else setNeedName(true)
   }
   function onNamed(name) {
     setName(name)
     setNeedName(false)
-    setStarted(true)
+    begin()
   }
 
   const Game = game.Component

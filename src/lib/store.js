@@ -84,10 +84,10 @@ export function finishSession(gameId, score, xpGain) {
 }
 
 // ---------- leaderboards ----------
-export function recordScore(gameId, score, summary) {
+export function recordScore(gameId, score, summary, ms = 0) {
   const name = getProfile().name || 'Player'
   const rows = read(SCORES_KEY, [])
-  rows.push({ gameId, name, score, summary, day: todayKey(), ts: Date.now() })
+  rows.push({ gameId, name, score, summary, ms, day: todayKey(), ts: Date.now() })
   write(SCORES_KEY, rows)
 }
 
@@ -98,9 +98,13 @@ export function getBoard(gameId, scope = 'today') {
   const best = new Map()
   for (const r of filtered) {
     const prev = best.get(r.name)
-    if (!prev || r.score > prev.score) best.set(r.name, r)
+    const better =
+      !prev || r.score > prev.score || (r.score === prev.score && (r.ms || 0) < (prev.ms || 0))
+    if (better) best.set(r.name, r)
   }
-  return [...best.values()].sort((a, b) => b.score - a.score).slice(0, 20)
+  return [...best.values()]
+    .sort((a, b) => b.score - a.score || (a.ms || 0) - (b.ms || 0))
+    .slice(0, 20)
 }
 
 // overall board: total of each player's best score across all games

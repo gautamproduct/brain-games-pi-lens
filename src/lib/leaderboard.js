@@ -11,14 +11,16 @@ import { XP_MAX } from '../games/index.js'
 const norm10 = (gameId, score) => Math.min(10, Math.round((score / (XP_MAX[gameId] || 10)) * 10))
 
 const mapLocal = (rows) =>
-  rows.map((r) => ({ name: r.name, score: r.score, uid: r.name, me: r.name === myName() }))
+  rows.map((r) => ({ name: r.name, score: r.score, ms: r.ms || 0, uid: r.name, me: r.name === myName() }))
 
 function bestPerUser(rows) {
   const m = new Map()
   for (const r of rows) {
     const k = r.user_id || r.name
     const prev = m.get(k)
-    if (!prev || r.score > prev.score) m.set(k, { name: r.name, score: r.score, uid: k })
+    const ms = r.ms || 0
+    const better = !prev || r.score > prev.score || (r.score === prev.score && ms < prev.ms)
+    if (better) m.set(k, { name: r.name, score: r.score, uid: k, ms })
   }
   return [...m.values()]
 }
@@ -41,11 +43,11 @@ export async function gameBoard(gameId, scope = 'today') {
   return cached(`g:${gameId}:${scope}:${todayKey()}`, async () => {
     const f = scope === 'today' ? `&day=eq.${todayKey()}` : ''
     const rows = await sbSelect(
-      `plays?select=user_id,name,score&game_id=eq.${gameId}${f}&order=score.desc&limit=400`,
+      `plays?select=*&game_id=eq.${gameId}${f}&order=score.desc&limit=400`,
     )
     const me = getUserId()
     return bestPerUser(rows)
-      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => b.score - a.score || a.ms - b.ms) // faster wins ties
       .slice(0, 30)
       .map((r) => ({ ...r, me: r.uid === me }))
   })
@@ -55,24 +57,27 @@ export async function overallBoard(scope = 'today') {
   if (!supabaseEnabled) return mapLocal(getOverallBoard())
   return cached(`o:${scope}:${todayKey()}`, async () => {
     const f = scope === 'today' ? `day=eq.${todayKey()}&` : ''
-    const rows = await sbSelect(`plays?select=user_id,name,game_id,score&${f}order=score.desc&limit=2000`)
+    const rows = await sbSelect(`plays?select=*&${f}order=score.desc&limit=2000`)
     const bestNG = new Map()
     for (const r of rows) {
       const uid = r.user_id || r.name
       const k = uid + '|' + r.game_id
+      const ms = r.ms || 0
       const p = bestNG.get(k)
-      if (!p || r.score > p.score) bestNG.set(k, { name: r.name, uid, gameId: r.game_id, score: r.score })
+      const better = !p || r.score > p.score || (r.score === p.score && ms < p.ms)
+      if (better) bestNG.set(k, { name: r.name, uid, gameId: r.game_id, score: r.score, ms })
     }
     const tot = new Map()
     for (const v of bestNG.values()) {
-      const t = tot.get(v.uid) || { name: v.name, uid: v.uid, score: 0 }
+      const t = tot.get(v.uid) || { name: v.name, uid: v.uid, score: 0, ms: 0 }
       t.score += norm10(v.gameId, v.score) // normalized: each game max 10
+      t.ms += v.ms // total time across games → faster breaks ties
       t.name = v.name
       tot.set(v.uid, t)
     }
     const me = getUserId()
     return [...tot.values()]
-      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => b.score - a.score || a.ms - b.ms)
       .slice(0, 30)
       .map((r) => ({ ...r, me: r.uid === me }))
   })

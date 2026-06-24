@@ -32,13 +32,22 @@ const headers = () => ({
 })
 
 // Fire-and-forget: records that a user played a game on a given day.
-export async function logPlay({ userId, name, gameId, score }) {
+// Includes time (ms) for the speed tiebreak; if the ms column doesn't exist
+// yet it retries without it, so logging never breaks.
+export async function logPlay({ userId, name, gameId, score, ms }) {
   if (!supabaseEnabled) return
+  const base = { user_id: userId, name, game_id: gameId, day: todayKey(), score }
   try {
+    const res = await fetch(`${URL}/rest/v1/plays`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ ...base, ms }),
+    })
+    if (res.ok) return
     await fetch(`${URL}/rest/v1/plays`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ user_id: userId, name, game_id: gameId, day: todayKey(), score }),
+      body: JSON.stringify(base),
     })
   } catch {
     // network/keys not ready — ignore, the local game is unaffected
