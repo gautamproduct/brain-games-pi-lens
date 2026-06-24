@@ -15,7 +15,7 @@ import {
   DAILY_LIMIT,
 } from './lib/store.js'
 import { gameBoard, overallBoard, myDailyRank, clearBoardCache } from './lib/leaderboard.js'
-import { logPlay, supabaseEnabled } from './lib/supabase.js'
+import { logPlay, logShare, supabaseEnabled } from './lib/supabase.js'
 import { shareResult, shareInvite } from './lib/share.js'
 import { confetti } from './lib/confetti.js'
 import { winBuzz } from './lib/haptics.js'
@@ -301,7 +301,13 @@ function ResultView({ game, result, onRanks, onExit }) {
         )}
       </div>
 
-      <button className="primary-btn big" onClick={() => shareResult(game, result)}>
+      <button
+        className="primary-btn big"
+        onClick={() => {
+          logShare({ userId: getUserId(), name: myName(), kind: 'score' })
+          shareResult(game, result)
+        }}
+      >
         📤 Share my score
       </button>
       <button className="secondary-btn big" onClick={onRanks}>🏆 Full leaderboard</button>
@@ -373,7 +379,13 @@ function Ranks({ onBack, onChanged }) {
         <div className="yc-rank"><b>{rank ? `#${rank}` : '—'}</b><span>today</span></div>
       </div>
 
-      <button className="invite-cta" onClick={shareInvite}>
+      <button
+        className="invite-cta"
+        onClick={() => {
+          logShare({ userId: getUserId(), name: myName(), kind: 'invite' })
+          shareInvite()
+        }}
+      >
         <span className="invite-emoji">🏆</span>
         <span className="invite-text">
           <b>Challenge your friends</b>

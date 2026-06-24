@@ -24,27 +24,37 @@ export async function sbSelect(path) {
   }
 }
 
+const headers = () => ({
+  apikey: KEY,
+  Authorization: `Bearer ${KEY}`,
+  'Content-Type': 'application/json',
+  Prefer: 'return=minimal',
+})
+
 // Fire-and-forget: records that a user played a game on a given day.
 export async function logPlay({ userId, name, gameId, score }) {
   if (!supabaseEnabled) return
   try {
     await fetch(`${URL}/rest/v1/plays`, {
       method: 'POST',
-      headers: {
-        apikey: KEY,
-        Authorization: `Bearer ${KEY}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        name,
-        game_id: gameId,
-        day: todayKey(),
-        score,
-      }),
+      headers: headers(),
+      body: JSON.stringify({ user_id: userId, name, game_id: gameId, day: todayKey(), score }),
     })
   } catch {
     // network/keys not ready — ignore, the local game is unaffected
+  }
+}
+
+// Records that a user clicked a share button. kind = 'score' | 'invite'.
+export async function logShare({ userId, name, kind }) {
+  if (!supabaseEnabled) return
+  try {
+    await fetch(`${URL}/rest/v1/shares`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ user_id: userId, name, kind, day: todayKey() }),
+    })
+  } catch {
+    // table/keys not ready — ignore
   }
 }
