@@ -39,41 +39,52 @@ function drawLogo(ctx, cx, cy, r, lw) {
   ctx.restore()
 }
 
-// ---- OG image (1200x630) ----
+// ---- OG image (1200x630) — premium minimalist ----
 {
   const W = 1200, H = 630
   const c = createCanvas(W, H)
   const ctx = c.getContext('2d')
+
+  // deep near-black background, faint cool tint
   const bg = ctx.createLinearGradient(0, 0, W, H)
-  bg.addColorStop(0, '#101a36')
-  bg.addColorStop(1, '#0a0712')
+  bg.addColorStop(0, '#0b1124')
+  bg.addColorStop(1, '#070610')
   ctx.fillStyle = bg
   ctx.fillRect(0, 0, W, H)
 
-  drawLogo(ctx, 300, 300, 132, 52)
+  // soft glow behind the mark for depth
+  const glow = ctx.createRadialGradient(330, 300, 20, 330, 300, 380)
+  glow.addColorStop(0, 'rgba(70,130,255,0.18)')
+  glow.addColorStop(1, 'rgba(70,130,255,0)')
+  ctx.fillStyle = glow
+  ctx.fillRect(0, 0, W, H)
 
-  // accent tiles under the logo
-  const colors = ['#7c5cff', '#00d4ff', '#2ee6a6', '#ffd24a', '#ff5d6c']
-  let x = 235
-  for (const col of colors) {
-    ctx.fillStyle = col
-    roundRect(ctx, x, 478, 54, 54, 12)
-    ctx.fill()
-    x += 68
-  }
+  // refined inset hairline frame
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'
+  ctx.lineWidth = 1.5
+  roundRect(ctx, 36, 36, W - 72, H - 72, 28)
+  ctx.stroke()
 
-  ctx.fillStyle = '#eef2ff'
-  ctx.font = 'bold 92px Arial'
-  ctx.fillText('Brain Games', 500, 280)
-  ctx.fillStyle = '#00d4ff'
-  ctx.font = 'bold 46px Arial'
-  ctx.fillText('By: Pi Lens App', 502, 342)
-  ctx.fillStyle = '#c3ccf2'
-  ctx.font = '40px Arial'
-  ctx.fillText('8 free brain games · daily challenge', 502, 422)
-  ctx.fillStyle = '#8b96b5'
+  // the mark
+  drawLogo(ctx, 322, 300, 116, 40)
+
+  // text block — generous negative space, clean hierarchy
+  const tx = 524
+  ctx.fillStyle = '#f3f5ff'
+  ctx.font = 'bold 96px Arial'
+  ctx.fillText('Brain Games', tx, 300)
+
+  ctx.fillStyle = '#3fc6ff'
+  ctx.font = 'bold 34px Arial'
+  ctx.fillText('by Pi Lens', tx + 4, 350)
+
+  ctx.fillStyle = '#9aa6c8'
   ctx.font = '34px Arial'
-  ctx.fillText('Live leaderboard · train your focus · play free', 502, 472)
+  ctx.fillText('Daily brain challenges · live leaderboard', tx + 2, 432)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.30)'
+  ctx.font = 'bold 25px Arial'
+  ctx.fillText('brain-games-pi-lens.netlify.app', tx + 2, 540)
 
   writeFileSync('public/og.png', c.toBuffer('image/png'))
 }
