@@ -59,7 +59,7 @@ export default function TrueFalse({ rng, onFinish }) {
   }
 
   return (
-    <div className="gf">
+    <div className={`gf ${low ? 'time-low' : ''}`}>
       <div className="gf-hud">
         <div className="hud-chip"><span className="hud-k">Q {i + 1}/{QS}</span><b className="grad">{correctRef.current}</b></div>
         <div className="hud-chip right"><b className={`hud-time ${low ? 'low' : ''}`}>{(left / 1000).toFixed(0)}s</b><span className="hud-k">time left</span></div>

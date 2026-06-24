@@ -74,7 +74,7 @@ export default function NumberFlash({ rng, onFinish }) {
   const low = left <= 2500
 
   return (
-    <div className="gf">
+    <div className={`gf ${low ? 'time-low' : ''}`}>
       <div className="gf-hud">
         <div className="hud-chip">
           <span className="hud-k">ROUND</span>

@@ -60,7 +60,7 @@ export default function FlashMemory({ rng, onFinish }) {
   const showing = phase === 'show'
 
   return (
-    <div className="gf">
+    <div className={`gf ${low && phase === 'pick' ? 'time-low' : ''}`}>
       <div className="gf-hud">
         <div className="hud-chip">
           <span className="hud-k">LEVEL</span>
