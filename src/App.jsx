@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Logo from './Logo.jsx'
-import { GAMES, featuredGame } from './games/index.js'
+import { GAMES, featuredGame, XP_MAX } from './games/index.js'
 import { dailyRng, todayKey } from './lib/rng.js'
 import {
   getProfile,
@@ -162,7 +162,8 @@ function Session({ game, locked, onExit, onRanks }) {
   const rng = useMemo(() => dailyRng(game.id), [game.id])
 
   function handleFinish({ score, summary }) {
-    const xpGain = Math.round(score) // XP = points earned; stays 1–2 digit
+    // normalize XP to a fair 1–10 scale across all games
+    const xpGain = Math.max(1, Math.min(10, Math.round((score / (XP_MAX[game.id] || 10)) * 10)))
     finishSession(game.id, score, xpGain)
     recordScore(game.id, score, summary)
     logPlay({ userId: getUserId(), name: myName(), gameId: game.id, score })

@@ -150,6 +150,19 @@ export const RIVAL_RANGE = {
   zip: [28, 82],
 }
 
+// Score that counts as a perfect 10-XP run, per game (so XP is a fair 1–10
+// scale across games regardless of their internal scoring).
+export const XP_MAX = {
+  schulte: 70,
+  stroop: 10,
+  flash: 10,
+  numflash: 10,
+  speed: 10,
+  truefalse: 10,
+  crossmath: 5,
+  zip: 80,
+}
+
 export const gameById = (id) => GAMES.find((g) => g.id === id)
 
 // Pin specific dates to a chosen game; every other day rotates automatically.
