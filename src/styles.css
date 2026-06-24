@@ -711,3 +711,23 @@ button { transition: transform .09s ease, box-shadow .22s ease, border-color .22
   .opt-btn.num { font-size: 20px; }
   .dh-name { font-size: 20px; }
 }
+
+/* ============ fixes: option visibility, full-screen game, zip buttons ============ */
+/* options were too dark/translucent — make them clearly visible cards */
+.opt-btn { background: var(--card-2); border: 1px solid var(--line); color: var(--text); }
+.opt-btn .swatch { box-shadow: 0 0 0 1px rgba(255,255,255,.15); }
+.opt-btn.good { background: rgba(46,230,166,.2); border-color: var(--ok); color: #fff; }
+.opt-btn.bad { background: rgba(255,93,108,.2); border-color: var(--bad); color: #fff; }
+.bigq { color: var(--text); }
+
+/* game session must fully cover the screen (no home cards / chrome peeking) */
+.session { z-index: 100; height: 100dvh; background: var(--bg); }
+.session::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background:
+    radial-gradient(700px 360px at 50% -8%, color-mix(in srgb, var(--g1) 22%, transparent), transparent 60%),
+    var(--bg);
+}
+
+/* zip control buttons were too small */
+.zip-controls .secondary-btn { min-height: 50px; font-size: 15px; }

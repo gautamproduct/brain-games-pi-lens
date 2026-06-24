@@ -14,10 +14,11 @@ import {
   getUserId,
   DAILY_LIMIT,
 } from './lib/store.js'
-import { gameBoard, overallBoard, myDailyRank } from './lib/leaderboard.js'
+import { gameBoard, overallBoard, myDailyRank, clearBoardCache } from './lib/leaderboard.js'
 import { logPlay, supabaseEnabled } from './lib/supabase.js'
 import { shareResult, shareInvite } from './lib/share.js'
 import { confetti } from './lib/confetti.js'
+import { winBuzz } from './lib/haptics.js'
 
 const PI_LENS_URL = 'https://play.google.com/store/apps/details?id=live.pw.pilens'
 
@@ -112,11 +113,6 @@ function Home({ onPlay }) {
     <div className="home fade-in">
       <DailyHero game={featured} onPlay={onPlay} done={plays[featured.id] >= DAILY_LIMIT} />
 
-      <div className="section-head">
-        <h2>Free Games</h2>
-        <span className="pill-free">8 unlocked</span>
-      </div>
-
       <div className="game-grid">
         {GAMES.map((g) => (
           <button
@@ -170,6 +166,8 @@ function Session({ game, locked, onExit, onRanks }) {
     finishSession(game.id, score, xpGain)
     recordScore(game.id, score, summary)
     logPlay({ userId: getUserId(), name: myName(), gameId: game.id, score })
+    clearBoardCache() // so the leaderboard reflects this run
+    winBuzz()
     setResult({ score, summary, xpGain })
   }
 

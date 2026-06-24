@@ -104,7 +104,8 @@ export default function Zip({ rng, onFinish }) {
     setPath(np)
     setNextCp(nc)
     setHint(-1)
-    if (np.length === TOTAL && nc > K) {
+    if (nc > K) {
+      // all dots 1→K connected in order with one continuous line → solved
       doneRef.current = true
       const sec = (performance.now() - startRef.current) / 1000
       setTimeout(
@@ -157,18 +158,18 @@ export default function Zip({ rng, onFinish }) {
     <div className="gf">
       <div className="gf-hud">
         <div className="hud-chip">
-          <span className="hud-k">FILLED</span>
+          <span className="hud-k">DOTS</span>
           <b className="grad">
-            {path.length}/{TOTAL}
+            {Math.min(nextCp - 1, K)}/{K}
           </b>
         </div>
         <div className="hud-chip right">
-          <b>{nextCp > K ? '✓' : nextCp}</b>
-          <span className="hud-k">{nextCp > K ? 'all dots' : 'next dot'}</span>
+          <b className="hud-time">{(elapsed / 1000).toFixed(0)}s</b>
+          <span className="hud-k">{nextCp > K ? 'done!' : `next dot ${nextCp}`}</span>
         </div>
       </div>
 
-      <div className="zip-hint-line">⏱ {(elapsed / 1000).toFixed(0)}s · faster = higher score · hit 1→{K} in order</div>
+      <div className="zip-hint-line">Connect the dots 1→{K} in order · one continuous line · faster = higher score</div>
 
       <div
         className="zipgrid"
