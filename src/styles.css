@@ -760,3 +760,8 @@ button { transition: transform .09s ease, box-shadow .22s ease, border-color .22
   .gf.time-low::after, .hud-time.low, .timebar-fill.low,
   .gf.time-low .bigq, .gf.time-low .stroop-word-wrap, .gf.time-low .memgrid { animation: none !important; }
 }
+
+/* metric text (e.g. "8/10 · 14s") fits the score column */
+.lb-score { font-size: 14px; white-space: nowrap; }
+.mb-score { font-size: 13.5px; white-space: nowrap; }
+.board-row { grid-template-columns: 32px 1fr auto; }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Logo from './Logo.jsx'
-import { GAMES, featuredGame, XP_MAX } from './games/index.js'
+import { GAMES, featuredGame, XP_MAX, gameMetrics } from './games/index.js'
 import { dailyRng, todayKey } from './lib/rng.js'
 import {
   getProfile,
@@ -171,7 +171,7 @@ function Session({ game, locked, onExit, onRanks }) {
     logPlay({ userId: getUserId(), name: myName(), gameId: game.id, score, ms })
     clearBoardCache() // so the leaderboard reflects this run
     winBuzz()
-    setResult({ score, summary, xpGain })
+    setResult({ score, summary, xpGain, ms })
   }
 
   // rules first → Start → ask name (only if not set) → play
@@ -271,7 +271,7 @@ function ResultView({ game, result, onRanks, onExit }) {
       const others = b.filter((r) => !r.me)
       const mine = b.find((r) => r.me)
       const myScore = Math.max(result.score, mine ? mine.score : 0)
-      const merged = [...others, { name: myName(), score: myScore, uid, me: true }]
+      const merged = [...others, { name: myName(), score: myScore, uid, me: true, ms: result.ms }]
       merged.sort((a, x) => x.score - a.score)
       setBoard(merged.slice(0, 8))
     })
@@ -281,12 +281,13 @@ function ResultView({ game, result, onRanks, onExit }) {
   const rank = board ? (board.findIndex((r) => r.me) + 1 || null) : null
   const CHEERS = ['Nice work!', 'Sharp! 🧠', 'Well played!', 'Crushed it!', 'Brain power! ⚡', 'On a roll!']
   const cheer = CHEERS[result.score % CHEERS.length]
+  const m = gameMetrics(game.id, result.score, result.ms)
 
   return (
     <div className="result fade-in">
       <div className="result-emoji">{game.emoji}</div>
       <div className="result-cheer">{cheer}</div>
-      <div className="result-score">{result.score}</div>
+      <div className="result-score">{m.big}</div>
       <div className="result-sum">{result.summary}</div>
       <div className="result-chips">
         <span className="rchip xp">+{result.xpGain} XP</span>
@@ -302,7 +303,7 @@ function ResultView({ game, result, onRanks, onExit }) {
             <div key={r.uid + '' + i} className={`mb-row ${r.me ? 'me' : ''}`}>
               <span className="mb-rank">{['🥇', '🥈', '🥉'][i] || i + 1}</span>
               <span className="mb-name">{r.name}</span>
-              <span className="mb-score">{r.score}</span>
+              <span className="mb-score">{gameMetrics(game.id, r.score, r.ms).board}</span>
             </div>
           ))
         )}
@@ -430,7 +431,9 @@ function Ranks({ onBack, onChanged }) {
                 {r.name}
                 {r.me && <span className="you-tag">you</span>}
               </span>
-              <span className="lb-score">{r.score}</span>
+              <span className="lb-score">
+                {sel === 'overall' ? `${r.score} pts` : gameMetrics(sel, r.score, r.ms).board}
+              </span>
             </li>
           ))}
         </ol>

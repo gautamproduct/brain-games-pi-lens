@@ -163,6 +163,41 @@ export const XP_MAX = {
   zip: 80,
 }
 
+// correctness denominators per game (for "x / total" display)
+const TOTALS = { speed: 10, stroop: 10, truefalse: 10, numflash: 10, crossmath: 5 }
+
+function tstr(ms) {
+  if (!ms || ms <= 0) return null
+  const t = ms / 1000
+  return t < 60
+    ? `${t.toFixed(t < 10 ? 1 : 0)}s`
+    : `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, '0')}`
+}
+
+// Human-meaningful result: { big, sub } for the result screen, board for the
+// leaderboard. Shows real time + correctness instead of an abstract score.
+export function gameMetrics(gameId, score, ms) {
+  const ts = tstr(ms)
+  if (gameId === 'schulte') {
+    const s = ts || `${(600 / Math.max(score, 1)).toFixed(1)}s`
+    return { big: s, sub: 'finished', board: s }
+  }
+  if (gameId === 'zip') {
+    const s = ts || `${Math.max(0, 120 - score)}s`
+    return { big: s, sub: 'solved', board: s }
+  }
+  if (gameId === 'flash') {
+    const lv = `Lv ${score + 1}`
+    return { big: lv, sub: ts ? `lasted ${ts}` : 'reached', board: lv }
+  }
+  const total = TOTALS[gameId] || 10
+  return {
+    big: `${score}/${total}`,
+    sub: ts ? `in ${ts}` : 'correct',
+    board: ts ? `${score}/${total} · ${ts}` : `${score}/${total}`,
+  }
+}
+
 export const gameById = (id) => GAMES.find((g) => g.id === id)
 
 // Pin specific dates to a chosen game; every other day rotates automatically.
